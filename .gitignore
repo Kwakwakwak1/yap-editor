@@ -1,0 +1,39 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+
+# working media (your footage never belongs in this repo)
+media/
+build/
+out/
+work/
+*_masks/
+*_seed-preview.jpg
+
+# renderer
+render/node_modules/
+render/out/
+# git cannot un-ignore a file inside an ignored directory, so ignore the
+# contents rather than the directory itself — that keeps .gitkeep trackable
+render/public/reels/*
+!render/public/reels/.gitkeep
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# models (multi-hundred-MB checkpoints are fetched, not vendored)
+models/
+
+# review state — your decisions about your renders, not repo content
+review/approvals.json
+review/decisions.json
+
+# local build scaffolding (contracts, agent logs) — not part of the deliverable
+.planning/
+
+# os
+.DS_Store

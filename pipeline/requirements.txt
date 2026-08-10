@@ -1,0 +1,15 @@
+# Optional transcription backends
+mlx-whisper          # Apple Silicon transcription with mlx
+faster-whisper       # CPU or CUDA transcription
+openai-whisper       # Reference Whisper transcription
+
+# Optional greenscreen path
+mlx-sam              # Apple Silicon SAM 2.1 segmentation
+fastapi               # Local cutout studio
+uvicorn               # Local cutout studio server
+numpy                 # Cutout mask processing
+Pillow                # Cutout previews and image processing
+opencv-python         # Cutout compositing
+
+# Optional object-storage publishing
+boto3                 # S3-compatible review publishing

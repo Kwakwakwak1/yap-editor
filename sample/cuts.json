@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "slug": "sample",
+  "fps": 30,
+  "headline": "the edit is not the hard part",
+  "pad": [0.07, 0.07],
+  "loudness": { "i": -14, "tp": -1.5, "lra": 11 },
+
+  "takes": {
+    "A": {
+      "path": "sample/sample-16x9.mp4",
+      "words": "sample/sample.words.json"
+    }
+  },
+
+  "segments": [
+    {
+      "take": "A",
+      "start": 6.58,
+      "end": 11.08,
+      "beat": "hook",
+      "kind": "structural",
+      "reason": "the question is the video, and it was recorded at 0:06 behind five seconds of wind-up — this moves it to 0:00 and the wind-up is gone"
+    },
+    {
+      "take": "A",
+      "start": 11.98,
+      "end": 17.52,
+      "beat": "answer",
+      "kind": "structural",
+      "reason": "the inversion that answers the hook; kept whole because splitting it would break the one idea the cut exists to deliver"
+    },
+    {
+      "take": "A",
+      "start": 22.06,
+      "end": 25.98,
+      "beat": "point",
+      "kind": "mechanical"
+    },
+    {
+      "take": "A",
+      "start": 26.64,
+      "end": 28.62,
+      "beat": "payoff",
+      "kind": "mechanical"
+    },
+    {
+      "take": "A",
+      "start": 29.76,
+      "end": 30.54,
+      "beat": "close",
+      "kind": "mechanical"
+    }
+  ]
+}
