@@ -71,7 +71,7 @@ def make_html(entries: List[Dict[str, Any]]) -> str:
   </main>
   <script>
     const renders = {embedded};
-    const storageKey = 'landscape-on-black-review-decisions';
+    const storageKey = 'yap-editor-review-decisions';
     let decisions = {{}};
     try {{ decisions = JSON.parse(localStorage.getItem(storageKey) || '{{}}'); }} catch (error) {{ decisions = {{}}; }}
     const save = () => localStorage.setItem(storageKey, JSON.stringify(decisions));

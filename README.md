@@ -1,39 +1,76 @@
-# landscape-on-black
+# yap-editor
 
-## What this is
+Turn raw talking-to-camera takes into a finished 9:16 reel: transcribe the footage, plan the cut, assemble it, render it, review it on your phone, approve it.
 
-This is a small end-to-end talking-head reel system: transcribe footage, plan a cut, assemble it, render a 9:16 reel, review it on a phone, and approve it before promotion. The finished frame is black with a 16:9 clip band across the middle at 31.7% of the height, a persistent headline above it, and lowercase karaoke captions on the lower third of the video band.
+The finished frame is black, with the 16:9 clip as a band across the middle at 31.7% of the height, a persistent headline above it, and lowercase karaoke captions on the lower third of the band.
+
+## Install the dependencies
+
+Three things have to exist before anything here runs: **ffmpeg**, **Python 3**, and **Node 18+**. Remotion is not installed globally; it comes in with `npm install` inside `render/`.
+
+**macOS** (Homebrew, from [brew.sh](https://brew.sh)):
+
+```bash
+brew install ffmpeg python node
+```
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt update && sudo apt install -y ffmpeg python3 python3-pip
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
+```
+
+**Windows:** use [WSL2](https://learn.microsoft.com/windows/wsl/install) and follow the Debian steps inside it. The Remotion renderer wants a Linux or macOS environment.
+
+Check all three answer:
+
+```bash
+ffmpeg -version | head -1
+python3 --version
+node --version
+```
+
+Then install Remotion and its dependencies. This is the only build step in the repo, and it pulls Remotion, React, and the renderer into `render/node_modules`:
+
+```bash
+cd render
+npm install
+cd ..
+```
+
+On the **first render only**, Remotion downloads its own headless Chrome (a few hundred MB). That is why the first run takes minutes and later runs take seconds. Nothing else needs installing to produce a reel: transcription, cutout, and publishing are optional extras listed in `pipeline/requirements.txt`.
 
 ## The five-minute quickstart
 
 ```bash
-git clone <repo-url>
-cd landscape-on-black
-cd render && npm install
-cd ..
+git clone https://github.com/NulightJens/yap-editor.git
+cd yap-editor
+cd render && npm install && cd ..
 make quickstart
 open out/sample-reel.mp4
 ```
 
-Prerequisites are `ffmpeg`, `python3`, and Node 18 or newer. The only setup step for the renderer is `cd render && npm install`. On the first render, Remotion downloads a headless Chrome, so the first run takes longer than later runs.
-
-`make quickstart` uses the committed `sample/cuts.json` and does not need a transcription backend.
+`make quickstart` runs `cut` then `render` against the committed `sample/cuts.json`. It needs no transcription backend and no API keys.
 
 ## The worked example
 
-`sample/sample-16x9.mp4` is 31.333 seconds of deliberately badly structured narration. The hook starts at about 0:06 behind wind-up. A restart begins around 0:18 and the later attempt resolves at about 0:22. `sample/cuts.json` moves the hook to 0:00, drops the wind-up, keeps the later attempt, and lands at about 17 seconds.
+`sample/sample-16x9.mp4` is 31.333 seconds of deliberately badly structured narration. It opens on wind-up, buries the hook at about 0:06, and contains a restart at about 0:18 that resolves at 0:22. That is the raw material the method exists to fix.
 
-The assembled run produced these values:
+`sample/cuts.json` moves the hook to 0:00, drops the wind-up, keeps the later attempt of the restart, and lands at about 17 seconds. Five segments survive, at 4.687s, 5.721s, 4.088s, 2.154s and 0.954s after word-boundary padding.
+
+Verified from a clean clone:
 
 | Measurement | Result |
 | --- | ---: |
 | Planned duration | 17.604s |
 | Cut duration | 17.610s |
-| Loudness measurement | -14.55 LUFS |
+| Loudness | -14.55 LUFS (target -14 ±1) |
+| Join integrity | 56 words match the planned keep-text |
 | Pixel format | yuv420p |
 | Reel dimensions | 1080x1920 |
 
-The five kept segments were 4.687s, 5.721s, 4.088s, 2.154s, and 0.954s after word-boundary padding. The verification report records the optional join check as skipped because the available transcription package could not access its model in the build environment.
+Join integrity is the one that matters: `verify.py` re-transcribes the finished file and diffs it against what the plan said should be there, so a cut that clipped a word at a join fails rather than shipping. It reports `SKIPPED` rather than `PASS` when no transcription backend is installed.
 
 ## Bring your own footage
 
@@ -72,7 +109,7 @@ python3 pipeline/verify.py build/take-a/cut.mp4
 | --- | --- |
 | `agent/` | Editing method, craft references, execution protocol, and quality bar. |
 | `pipeline/` | Transcription, mechanical planning, FFmpeg assembly, captions, and verification. |
-| `render/` | Standalone Remotion composition for the landscape-on-black reel. |
+| `render/` | Standalone Remotion app. The `LandscapeOnBlack` composition is the reel layout. |
 | `cutout/` | Apple-Silicon `mlx-sam` greenscreen segmentation and compositing path. |
 | `review/` | Static phone review page, publishing, decision collection, and approval gate. |
 
@@ -80,9 +117,17 @@ python3 pipeline/verify.py build/take-a/cut.mp4
 
 The editing method is documented in `agent/AGENT.md` and the linked knowledge files. `pipeline/CUTS-SCHEMA.md` is the contract between editorial judgement and deterministic assembly.
 
-## Requirements
+## Optional extras
 
-Install the optional transcription, cutout, and publishing dependencies from the commented lines in `pipeline/requirements.txt`. The core plan, assembly, verification, review build, collection, and finalize scripts use Python's standard library plus `ffmpeg` and `ffprobe`.
+`plan.py`, `assemble.py`, `verify.py`, and every script in `review/` run on Python's standard library plus `ffmpeg` and `ffprobe`. Nothing else is required to make a reel.
+
+The extras, each a commented line in `pipeline/requirements.txt`:
+
+| Want | Install | Enables |
+| --- | --- | --- |
+| Transcription | `pip3 install faster-whisper` (or `mlx-whisper` on Apple Silicon) | `transcribe.py`, and the join-integrity check in `verify.py` |
+| Greenscreen cutout | `pip3 install mlx-sam pillow numpy scipy fastapi uvicorn` | `cutout/` (Apple Silicon only) |
+| Publishing to object storage | `pip3 install boto3` | `review/publish.py` |
 
 ## Licence
 
