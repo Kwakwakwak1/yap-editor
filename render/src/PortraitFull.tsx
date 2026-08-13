@@ -1,12 +1,21 @@
 // Full-bleed 9:16 variant: the take already fills the reel frame, so there is no
-// band and no letterboxing. Headline and captions sit directly over the video,
-// each behind a gradient scrim because — unlike LandscapeOnBlack — there is no
-// black background to guarantee contrast.
+// band and no letterboxing.
 //
-// The caption timing logic is duplicated from LandscapeOnBlack rather than
-// factored out on purpose: this file is a local addition to an upstream
-// checkout, and keeping it self-contained means only Root.tsx has to be merged
-// when pulling upstream changes.
+// Three things differ from LandscapeOnBlack beyond the framing:
+//
+//   1. The headline is optional. Full-bleed footage rarely needs a second title
+//      competing with the captions, so an empty headline renders nothing at all.
+//   2. Captions highlight the active word. Cue timing is all that reaches the
+//      renderer, so word times are estimated within a cue proportionally to word
+//      length — cues are <=5 words and <=2.4s, so the drift is well under a
+//      frame or two and never accumulates across cues.
+//   3. Captions sit clear of the platform's own chrome. Instagram and TikTok
+//      overlay the bottom ~250px of a 1920-tall frame with progress bar, handle,
+//      and buttons; anything below SAFE_BOTTOM risks being covered.
+//
+// Caption timing logic is duplicated from LandscapeOnBlack rather than factored
+// out on purpose: this file is a local addition to an upstream checkout, and
+// keeping it self-contained means only Root.tsx has to be merged when pulling.
 
 import React from "react";
 import {
@@ -20,17 +29,43 @@ import {
 } from "remotion";
 
 import {fontFamily} from "./fonts";
-import {LandscapeProps} from "./types";
+import {Caption, LandscapeProps} from "./types";
 
 export const W = 1080;
 export const H = 1920;
 export const TEMPLATE_DIMS = {width: W, height: H};
 
-export const PortraitFull: React.FC<LandscapeProps> = ({
+/** Platform chrome occupies roughly the bottom 250px; keep text above it. */
+const SAFE_BOTTOM = 430;
+
+type PortraitProps = LandscapeProps & {
+  /** Colour for the active caption word. Falls back to plain white. */
+  accent?: string;
+};
+
+/**
+ * Split a cue into words with estimated start times, weighting each word by its
+ * length. Whitespace is preserved by returning words and rendering with gaps.
+ */
+function timedWords(caption: Caption) {
+  const words = caption.text.split(/\s+/).filter(Boolean);
+  const span = Math.max(caption.to - caption.from, 0.001);
+  const totalWeight = words.reduce((sum, w) => sum + w.length + 1, 0);
+  let elapsed = 0;
+  return words.map((word) => {
+    const share = ((word.length + 1) / totalWeight) * span;
+    const start = caption.from + elapsed;
+    elapsed += share;
+    return {word, start, end: caption.from + elapsed};
+  });
+}
+
+export const PortraitFull: React.FC<PortraitProps> = ({
   clip,
   audio,
   headline,
   captions,
+  accent,
 }) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -58,45 +93,48 @@ export const PortraitFull: React.FC<LandscapeProps> = ({
       />
       {audio ? <Audio src={staticFile(audio)} /> : null}
 
-      {/* Scrim so the headline stays legible over a bright frame. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: W,
-          height: 380,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 96,
-          left: 60,
-          right: 60,
-          textAlign: "center",
-          fontSize: 62,
-          fontWeight: 700,
-          color: "#ffffff",
-          lineHeight: 1.16,
-          letterSpacing: -1,
-          textShadow: "0 2px 12px rgba(0,0,0,0.6)",
-        }}
-      >
-        {headline}
-      </div>
+      {headline ? (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: W,
+              height: 380,
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 96,
+              left: 60,
+              right: 60,
+              textAlign: "center",
+              fontSize: 62,
+              fontWeight: 700,
+              color: "#ffffff",
+              lineHeight: 1.16,
+              letterSpacing: -1,
+              textShadow: "0 2px 12px rgba(0,0,0,0.6)",
+            }}
+          >
+            {headline}
+          </div>
+        </>
+      ) : null}
 
-      {/* Scrim under the captions, in the lower third. */}
+      {/* Scrim under the captions, sized to sit above the platform chrome. */}
       <div
         style={{
           position: "absolute",
           bottom: 0,
           left: 0,
           width: W,
-          height: 620,
-          background: "linear-gradient(to top, rgba(0,0,0,0.78), rgba(0,0,0,0))",
+          height: SAFE_BOTTOM + 320,
+          background: "linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))",
           pointerEvents: "none",
         }}
       />
@@ -106,25 +144,35 @@ export const PortraitFull: React.FC<LandscapeProps> = ({
             position: "absolute",
             left: 54,
             right: 54,
-            bottom: 300,
+            bottom: SAFE_BOTTOM,
             textAlign: "center",
+            opacity: captionOpacity,
             pointerEvents: "none",
           }}
         >
-          <span
-            style={{
-              opacity: captionOpacity,
-              fontSize: 58,
-              fontWeight: 700,
-              color: "#ffffff",
-              lineHeight: 1.14,
-              letterSpacing: -0.5,
-              display: "inline",
-              textShadow: "0 2px 10px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.7)",
-            }}
-          >
-            {activeCaption.text.toLowerCase()}
-          </span>
+          {timedWords(activeCaption).map(({word, start, end}, i) => {
+            const isActive = time >= start && time < end;
+            return (
+              <span
+                key={`${start}-${i}`}
+                style={{
+                  fontSize: 58,
+                  fontWeight: 700,
+                  // Inactive words stay legible rather than dimming away; the
+                  // active word is picked out by colour, not by contrast.
+                  color: isActive && accent ? accent : "#ffffff",
+                  opacity: isActive || !accent ? 1 : 0.82,
+                  lineHeight: 1.14,
+                  letterSpacing: -0.5,
+                  textShadow: "0 2px 10px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.7)",
+                  marginRight: 14,
+                  display: "inline-block",
+                }}
+              >
+                {word.toLowerCase()}
+              </span>
+            );
+          })}
         </div>
       ) : null}
     </AbsoluteFill>
