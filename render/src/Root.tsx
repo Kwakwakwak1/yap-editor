@@ -2,7 +2,11 @@ import React from "react";
 import {Composition} from "remotion";
 
 import {LandscapeOnBlack} from "./LandscapeOnBlack";
-import {LandscapeProps} from "./types";
+import {PortraitFull} from "./PortraitFull";
+import {LAB_DEFAULTS, StyleLab, type StyleLabProps} from "./lab/StyleLab";
+import {StyledReel} from "./StyledReel";
+import {reelDurationSeconds} from "./style/duration";
+import {LandscapeProps, StyledReelProps} from "./types";
 
 const defaultProps: LandscapeProps = {
   clip: "reels/sample/clip.mp4",
@@ -15,24 +19,65 @@ const defaultProps: LandscapeProps = {
   fps: 30,
 };
 
+const calculateMetadata = ({props}: {props: StyledReelProps}) => {
+  const fps = props.fps ?? 30;
+  // `durationInSeconds` is the assembled CUT. An endcard follows it rather than
+  // covering its last seconds, so the composition has to grow by exactly what
+  // verify_reel's expected duration already adds.
+  const durationInSeconds = reelDurationSeconds(props.durationInSeconds ?? 10, props.style);
+  return {
+    fps,
+    durationInFrames: Math.max(1, Math.round(durationInSeconds * fps)),
+  };
+};
+
 export const Root: React.FC = () => {
   return (
-    <Composition<any, LandscapeProps>
-      id="LandscapeOnBlack"
-      component={LandscapeOnBlack}
-      width={1080}
-      height={1920}
-      fps={30}
-      durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
-      defaultProps={defaultProps}
-      calculateMetadata={({props}) => {
-        const fps = props.fps ?? 30;
-        const durationInSeconds = props.durationInSeconds ?? 10;
-        return {
-          fps,
-          durationInFrames: Math.max(1, Math.round(durationInSeconds * fps)),
-        };
-      }}
-    />
+    <>
+      <Composition<any, LandscapeProps>
+        id="LandscapeOnBlack"
+        component={LandscapeOnBlack}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
+        defaultProps={defaultProps}
+        calculateMetadata={calculateMetadata}
+      />
+      {/* The parametric composition. The two above are kept until the legacy
+          packs are proven frame-identical against them, and are then dead. */}
+      <Composition<any, LandscapeProps>
+        id="StyledReel"
+        component={StyledReel as never}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
+        defaultProps={defaultProps}
+        calculateMetadata={calculateMetadata}
+      />
+      {/* Authoring only. Never rendered by the worker: it draws a committed
+          fixture, not a job. */}
+      <Composition<any, StyleLabProps>
+        id="StyleLab"
+        component={StyleLab as never}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={90}
+        defaultProps={LAB_DEFAULTS}
+      />
+      {/* Local addition: full-bleed variant for takes shot vertically. */}
+      <Composition<any, LandscapeProps>
+        id="PortraitFull"
+        component={PortraitFull}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
+        defaultProps={defaultProps}
+        calculateMetadata={calculateMetadata}
+      />
+    </>
   );
 };

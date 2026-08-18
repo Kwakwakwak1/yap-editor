@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import sys
@@ -19,6 +21,7 @@ from common import (
     ffprobe_json,
     has_audio,
     load_json,
+    map_words_to_timeline,
     media_duration,
     repo_path,
     safe_record_path,
@@ -26,6 +29,7 @@ from common import (
     video_pixel_format,
     write_json,
 )
+from grade import filter_string
 
 
 ENCODERS = {"libx264", "h264_videotoolbox", "h264_nvenc"}
@@ -39,8 +43,11 @@ def number(value: Any, field: str) -> float:
 
 
 def validate_plan(plan: Dict[str, Any]) -> Tuple[str, int, Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
-    if plan.get("version") != 1:
-        raise ValueError("version must be 1")
+    # 2 adds the `style` block. 1 is still accepted: a plan written before style
+    # packs must keep assembling, and it simply stages props without a style,
+    # which the renderer treats as "use the defaults".
+    if plan.get("version") not in (1, 2):
+        raise ValueError("version must be 1 or 2")
     slug = plan.get("slug")
     if not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9-]+", slug):
         raise ValueError("slug must match [a-z0-9-]+")
@@ -96,6 +103,95 @@ def sentence_end(word: str) -> bool:
     return bool(re.search(r"[.!?][\"')\]]*$", word))
 
 
+def caption_grouping(plan: Dict[str, Any], cli_words: int, cli_seconds: float) -> Tuple[int, float]:
+    """How many words a cue holds, and for how long.
+
+    The style decides this when it has an opinion: 3 words at 1.2s reads nothing
+    like 7 at 3.0s, and that difference is as much a part of a style as its
+    typeface. It was a CLI flag, which meant every style got whatever the worker
+    happened to pass.
+
+    The CLI values remain the default, so a plan with no style -- or a style
+    that declines to say -- assembles exactly as it always did.
+    """
+    grouping = (((plan.get("style") or {}).get("captions") or {}).get("grouping") or {})
+    words = grouping.get("maxWords")
+    seconds = grouping.get("maxSeconds")
+    return (
+        int(words) if isinstance(words, (int, float)) and words > 0 else cli_words,
+        float(seconds) if isinstance(seconds, (int, float)) and seconds > 0 else cli_seconds,
+    )
+
+
+def props_fingerprint(props: Dict[str, Any]) -> str:
+    """A sha256 over everything in props except the fingerprint itself.
+
+    The worker reads props back after staging and checks this. That read-back is
+    inherited from `patch_accent`, which existed because assemble never wrote
+    the accent and the worker had to patch it in afterwards -- but the check it
+    performed guarded a real and separate failure: the MiniKWork sparse image
+    can re-attach read-only, leaving an intact, stale, and entirely renderable
+    props.json on disk. A render from that file succeeds and publishes the wrong
+    look, which is the worst kind of failure because nothing reports it.
+
+    Patching is gone now that the style is written at source. The witness is
+    not, and it covers every field rather than one colour.
+    """
+    payload = {k: v for k, v in props.items() if k != "specHash"}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def render_segments(resolved_segments: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The per-segment timeline the renderer needs, and nothing more.
+
+    `offset` and `duration` place each segment on the cut's timeline. `beat` and
+    `kind` are what a style keys off: a transition can punctuate *structural*
+    joins — where the edit made an editorial decision — while leaving
+    *mechanical* joins invisible, and a beat name can drive an on-screen label.
+    Both already exist in cuts.json, so this costs nothing to carry.
+
+    The editorial `reason` is deliberately excluded. It exists for the human at
+    the approval gate, it is long free text, and the renderer has no use for it.
+    """
+    return [
+        {
+            "offset": round(float(segment.get("offset", 0.0)), 3),
+            "duration": round(float(segment.get("duration", 0.0)), 3),
+            "beat": str(segment.get("beat", "")),
+            # Matches the default used when this is printed for the operator, so
+            # a segment without an explicit kind reads the same in both places.
+            "kind": str(segment.get("kind", "mechanical")),
+        }
+        for segment in resolved_segments
+    ]
+
+
+def caption_cue(words: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Build one cue, carrying the real per-word timings alongside the joined text.
+
+    The word times are measured -- transcribe.py always runs with
+    `word_timestamps=True` -- but this function used to emit only `text`, so the
+    renderer re-derived them by weighting each word's character length across the
+    cue span. Every word-level caption effect was therefore an approximation of
+    data we already had. `words` is additive: `from`, `to` and `text` are
+    unchanged, so captions.srt and any existing consumer are unaffected.
+    """
+    return {
+        "from": round(words[0]["from"], 3),
+        "to": round(words[-1]["to"], 3),
+        "text": " ".join(item["text"] for item in words),
+        "words": [
+            {
+                "from": round(item["from"], 3),
+                "to": round(item["to"], 3),
+                "text": item["text"],
+            }
+            for item in words
+        ],
+    }
+
+
 def format_srt_time(seconds: float) -> str:
     milliseconds = max(0, int(round(seconds * 1000)))
     hours, remainder = divmod(milliseconds, 3_600_000)
@@ -124,53 +220,24 @@ def build_captions(
             continue
         loaded[str(take_id)] = caption_words(words_path)
 
-    mapped: List[Dict[str, Any]] = []
-    for segment in resolved_segments:
-        source_words = loaded.get(str(segment["take"]), [])
-        start, end = float(segment["start"]), float(segment["end"])
-        padded_start = float(segment["padded_start"])
-        offset = float(segment["offset"])
-        for word in source_words:
-            try:
-                word_start, word_end = float(word["start"]), float(word["end"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if word_end <= start or word_start >= end:
-                continue
-            mapped.append({
-                "from": max(0.0, offset + word_start - padded_start),
-                "to": max(0.0, offset + word_end - padded_start),
-                "word": str(word.get("word", "")).strip(),
-            })
+    mapped = map_words_to_timeline(loaded, resolved_segments)
 
     cues: List[Dict[str, Any]] = []
     current: List[Dict[str, Any]] = []
     for word in mapped:
-        if not word["word"]:
+        if not word["text"]:
             continue
         would_exceed_words = len(current) >= max_words
         would_exceed_time = bool(current) and word["to"] - current[0]["from"] > max_seconds
         if current and (would_exceed_words or would_exceed_time):
-            cues.append({
-                "from": round(current[0]["from"], 3),
-                "to": round(current[-1]["to"], 3),
-                "text": " ".join(item["word"] for item in current),
-            })
+            cues.append(caption_cue(current))
             current = []
         current.append(word)
-        if sentence_end(word["word"]):
-            cues.append({
-                "from": round(current[0]["from"], 3),
-                "to": round(current[-1]["to"], 3),
-                "text": " ".join(item["word"] for item in current),
-            })
+        if sentence_end(word["text"]):
+            cues.append(caption_cue(current))
             current = []
     if current:
-        cues.append({
-            "from": round(current[0]["from"], 3),
-            "to": round(current[-1]["to"], 3),
-            "text": " ".join(item["word"] for item in current),
-        })
+        cues.append(caption_cue(current))
     return cues, skipped
 
 
@@ -230,6 +297,10 @@ def main() -> int:
         if pad_before < 0 or pad_after < 0:
             raise ValueError("pad values cannot be negative")
 
+        grade_filters = filter_string((plan.get("style") or {}).get("grade"))
+        if grade_filters:
+            print(f"Grading: {grade_filters}")
+
         print(f"Assembling {slug}: {len(segments)} segment(s), {fps} fps, width {args.width}")
         for index, segment in enumerate(segments, start=1):
             take_id = str(segment["take"])
@@ -248,7 +319,23 @@ def main() -> int:
                 "-ss", f"{padded_start:.3f}", "-i", str(source),
                 "-t", f"{padded_duration:.3f}",
                 "-map", "0:v:0", "-map", "0:a:0?",
-                "-vf", f"scale={args.width}:-2,fps={fps},format=yuv420p",
+                # The grade joins the chain that already runs, so it costs no
+                # extra pass -- and because cut.mp4 is also the preview, the
+                # preview shows the grade, which is the point of previewing a
+                # style before approving it.
+                #
+                # After scale, before format: grading at the output size means
+                # the same filter values look the same regardless of source
+                # resolution, and format=yuv420p must stay last so the pixel
+                # format verify.py checks is the one that lands.
+                "-vf", ",".join(
+                    part for part in (
+                        f"scale={args.width}:-2",
+                        f"fps={fps}",
+                        grade_filters,
+                        "format=yuv420p",
+                    ) if part
+                ),
                 "-c:v", args.encoder,
                 *encoder_args(args.encoder),
                 "-pix_fmt", "yuv420p",
@@ -305,7 +392,9 @@ def main() -> int:
                 f"{float(segment['duration']):6.3f}s  offset {float(segment['offset']):6.3f}s"
             )
 
-        cues, skipped_takes = build_captions(plan, resolved_segments, args.caption_words, args.caption_max_seconds)
+        max_words, max_seconds = caption_grouping(
+            plan, args.caption_words, args.caption_max_seconds)
+        cues, skipped_takes = build_captions(plan, resolved_segments, max_words, max_seconds)
         write_captions(build_dir, cues)
         for take_id in skipped_takes:
             print(f"Captions skipped for take {take_id}: no words file")
@@ -324,10 +413,25 @@ def main() -> int:
                 "clip": f"reels/{slug}/clip.mp4",
                 "headline": str(plan.get("headline", "")),
                 "captions": cues,
+                "segments": render_segments(resolved_segments),
                 "durationInSeconds": round(final_duration, 3),
                 "fps": fps,
             }
-            write_json(stage_dir / "props.json", props)
+            # The style travels inside cuts.json, which is the file that already
+            # holds every decision about this video -- one file reproduces one
+            # reel, and a second one to keep in sync would drift.
+            style = plan.get("style")
+            if isinstance(style, dict) and style:
+                props["style"] = style
+                source = style.get("render", {}).get("sourceOrientation")
+                if source:
+                    props["sourceOrientation"] = source
+            props["specHash"] = props_fingerprint(props)
+            # Written atomically: a half-written props.json is indistinguishable
+            # from a stale one to anything that reads it later.
+            temporary = stage_dir / "props.json.tmp"
+            write_json(temporary, props)
+            os.replace(temporary, stage_dir / "props.json")
             print(f"Staged renderer inputs at {display_path(stage_dir)}")
         else:
             print("Renderer staging skipped (--no-stage)")

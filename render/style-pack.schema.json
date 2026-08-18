@@ -1,0 +1,1272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kwakwakwak.com/schemas/style-pack-1.json",
+  "title": "Style pack",
+  "description": "A complete description of how a reel looks. New styles are data, not code -- with two deliberate exceptions: typefaces and music beds must already be in the render bundle, so `captions.family` and `audio.music.track` are keys into registries the renderer ships, never names or URLs. That registry size is the real ceiling on how far a data-only catalog can grow.",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "name",
+    "canvases",
+    "minRendererVersion",
+    "tokens",
+    "captions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped on ANY content change. Append-only: (id, version) is the primary key, which is what makes rollback free and sample invalidation trivial."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "default": ""
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "canvases": {
+      "type": "array",
+      "minItems": 1,
+      "default": [
+        "portrait"
+      ],
+      "items": {
+        "enum": [
+          "portrait",
+          "landscape"
+        ]
+      }
+    },
+    "sourceFit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How source footage sits inside the canvas, by the SOURCE's own orientation. Distinct from the canvas: the canvas is what the operator asked for, this is how the footage fills it.",
+      "properties": {
+        "portrait": {
+          "enum": [
+            "cover",
+            "contain",
+            "letterbox-blur"
+          ],
+          "default": "cover"
+        },
+        "landscape": {
+          "enum": [
+            "cover",
+            "contain",
+            "letterbox-blur"
+          ],
+          "default": "letterbox-blur"
+        }
+      }
+    },
+    "minRendererVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The worker refuses the job before paying for a render if RENDERER_VERSION is lower."
+    },
+    "status": {
+      "enum": [
+        "active",
+        "hidden"
+      ],
+      "default": "active",
+      "description": "`hidden` keeps a pack resolvable for jobs already approved against it while keeping it out of the picker. The three legacy-* packs exist only to preserve the look of jobs created before the catalog did, and a carousel offering \"Legacy none\" as a choice is a catalog that lies about what it is for."
+    },
+    "source": {
+      "enum": [
+        "catalog",
+        "brand",
+        "derived"
+      ],
+      "default": "catalog",
+      "description": "Where this pack came from. `catalog` is one of the shipped ten and is read-only -- editing one forks it. `brand` is a fork someone tuned for a particular brand, and it shadows the catalog pack of the same id for that brand only. `derived` is reserved for a pack inferred from a reference video."
+    },
+    "brand": {
+      "type": "string",
+      "description": "The brand slug a `brand` pack belongs to. Absent on a catalog pack. Duplicated into a column so the catalog can be queried by brand, and kept in the document so an exported pack still says what it is."
+    },
+    "capabilities": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "enum": [
+          "grade",
+          "zoom",
+          "transitions",
+          "music",
+          "broll",
+          "furniture"
+        ]
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "Slots the brand fills. A pack never hardcodes a colour or a family; it declares what it needs and what to fall back to.",
+      "additionalProperties": {
+        "$ref": "#/$defs/tokenSlot"
+      }
+    },
+    "grade": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Compiled to an ffmpeg filtergraph in assemble's existing per-segment pass -- free, because that pass already re-encodes, and it means the preview shows the grade. A CLOSED whitelist with clamped ranges: accepting a raw filter string here would be a filtergraph injection surface into a subprocess.",
+      "properties": {
+        "exposure": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "default": 0
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2,
+          "default": 1
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 1
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "default": 0
+        },
+        "tint": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "default": 0
+        },
+        "lift": {
+          "$ref": "#/$defs/rgbTriplet"
+        },
+        "gain": {
+          "$ref": "#/$defs/rgbTriplet"
+        },
+        "vignette": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "sharpen": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0
+        },
+        "grain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "required": [
+        "mode",
+        "family"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "word-highlight",
+            "line-pop",
+            "static",
+            "off"
+          ]
+        },
+        "grouping": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Was a CLI flag on assemble.py. It is a real stylistic axis -- 3 words at 1.2s reads nothing like 7 at 3.0s -- so it belongs to the style.",
+          "properties": {
+            "maxWords": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "default": 5
+            },
+            "maxSeconds": {
+              "type": "number",
+              "minimum": 0.4,
+              "maximum": 6,
+              "default": 2.4
+            },
+            "breakOnPunctuation": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "family": {
+          "$ref": "#/$defs/tokenRefOrFontKey"
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900,
+          "default": 700
+        },
+        "size": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "portrait": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            },
+            "landscape": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            }
+          }
+        },
+        "case": {
+          "enum": [
+            "upper",
+            "lower",
+            "sentence",
+            "as-written"
+          ],
+          "default": "as-written"
+        },
+        "tracking": {
+          "type": "number",
+          "minimum": -0.1,
+          "maximum": 0.4,
+          "default": 0
+        },
+        "lineHeight": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 2,
+          "default": 1.15
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "default": "center"
+        },
+        "anchor": {
+          "$ref": "#/$defs/anchor"
+        },
+        "safeArea": {
+          "enum": [
+            "reels",
+            "none"
+          ],
+          "default": "reels",
+          "description": "Instagram and TikTok overlay the bottom of the frame with their own chrome."
+        },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "idle": {
+              "$ref": "#/$defs/colorRef"
+            },
+            "active": {
+              "$ref": "#/$defs/colorRef"
+            },
+            "idleOpacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1
+            }
+          }
+        },
+        "box": {
+          "$ref": "#/$defs/captionBox"
+        },
+        "stroke": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24,
+              "default": 0
+            },
+            "color": {
+              "$ref": "#/$defs/colorRef"
+            }
+          }
+        },
+        "shadow": {
+          "description": "One shadow, or several layered from back to front. Layering is how caption text stays legible over arbitrary footage -- a wide soft shadow lifts the glyph off the background while a tight dark one defines its edge -- and the treatment this app already shipped uses exactly that pair.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "blur": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 60,
+                  "default": 0
+                },
+                "y": {
+                  "type": "number",
+                  "minimum": -20,
+                  "maximum": 20,
+                  "default": 0
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "blur": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 60,
+                    "default": 0
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": -20,
+                    "maximum": 20,
+                    "default": 0
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "animation": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-word effects need the measured word timings assemble now writes into captions[].words. Estimating them from character length is wrong by up to 11 frames.",
+          "properties": {
+            "preset": {
+              "enum": [
+                "none",
+                "pop",
+                "rise",
+                "fade",
+                "blur-in",
+                "typewriter"
+              ],
+              "default": "none"
+            },
+            "activeScale": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 1.6,
+              "default": 1
+            },
+            "spring": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "damping": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "stiffness": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "mass": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 5
+                }
+              }
+            },
+            "enter": {
+              "$ref": "#/$defs/enterExit"
+            },
+            "exit": {
+              "$ref": "#/$defs/enterExit"
+            }
+          }
+        }
+      }
+    },
+    "scrim": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "top": {
+          "$ref": "#/$defs/scrimEdge"
+        },
+        "bottom": {
+          "$ref": "#/$defs/scrimEdge"
+        }
+      }
+    },
+    "zoom": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Rendered as a transform on the footage. Requires assemble to stage at canvas x maxScale (stageWidth) -- otherwise the frame is upscaled past its source and every zoom style renders soft.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "slow-drift",
+            "beat",
+            "punch"
+          ],
+          "default": "none"
+        },
+        "baseScale": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "maxScale": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "anchor": {
+          "enum": [
+            "center",
+            "upper-third",
+            "face"
+          ],
+          "default": "center"
+        },
+        "onSegmentStart": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scaleFrom": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 1.5
+            },
+            "scaleTo": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 1.5
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000
+            },
+            "easing": {
+              "enum": [
+                "linear",
+                "outCubic",
+                "inOutCubic",
+                "spring"
+              ]
+            },
+            "applyTo": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "structural",
+                  "mechanical"
+                ]
+              }
+            }
+          }
+        },
+        "drift": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "perSecond": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.05
+            }
+          }
+        }
+      }
+    },
+    "transitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Punctuation only. Cross-dissolves need two overlapping streams, but cut.mp4 is a single concat -- and it is also the preview -- so they are deliberately out of scope here.",
+      "properties": {
+        "atSegmentBoundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Keyed by segment kind, so an edit the editor decided on can be punctuated while routine joins stay invisible.",
+          "properties": {
+            "structural": {
+              "$ref": "#/$defs/transition"
+            },
+            "mechanical": {
+              "$ref": "#/$defs/transition"
+            }
+          }
+        },
+        "atHook": {
+          "$ref": "#/$defs/transition"
+        },
+        "overlay": {
+          "$ref": "#/$defs/transition"
+        },
+        "totalOverlapSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0,
+          "description": "Read by verify_reel's expected-duration check."
+        }
+      }
+    },
+    "furniture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "headline": {
+          "$ref": "#/$defs/headline"
+        },
+        "logoBug": {
+          "$ref": "#/$defs/logoBug"
+        },
+        "stepLabels": {
+          "$ref": "#/$defs/stepLabels"
+        },
+        "lowerThird": {
+          "$ref": "#/$defs/lowerThird"
+        },
+        "endcard": {
+          "$ref": "#/$defs/endcard"
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "music": {
+          "description": "null means no bed. `track` is a bundled key: the renderer resolves it with staticFile(), so a name the bundle does not carry cannot be fetched at render time.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "track"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "track": {
+                  "$ref": "#/$defs/musicKey"
+                },
+                "gainDb": {
+                  "type": "number",
+                  "minimum": -60,
+                  "maximum": 0,
+                  "default": -26
+                },
+                "fadeInMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000,
+                  "default": 350
+                },
+                "fadeOutMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000,
+                  "default": 1200
+                },
+                "loop": {
+                  "type": "boolean",
+                  "default": true
+                }
+              }
+            }
+          ]
+        },
+        "duck": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Driven by the speech envelope pipeline/energy.py produces -- the same artifact the filler trimmer uses.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "amountDb": {
+              "type": "number",
+              "minimum": -40,
+              "maximum": 0,
+              "default": -9
+            },
+            "attackMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000,
+              "default": 80
+            },
+            "releaseMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000,
+              "default": 320
+            },
+            "source": {
+              "enum": [
+                "speechEnvelope",
+                "fixed"
+              ],
+              "default": "speechEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "broll": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Appetite only. WHICH clip is chosen is not a style decision -- it comes from the library, or from a script's explicit [b-roll: ...] cue.",
+      "properties": {
+        "density": {
+          "enum": [
+            "none",
+            "low",
+            "med",
+            "high"
+          ],
+          "default": "none"
+        },
+        "maxClipSeconds": {
+          "type": "number",
+          "minimum": 0.3,
+          "maximum": 10,
+          "default": 2.5
+        },
+        "minGapSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60,
+          "default": 6
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain"
+          ],
+          "default": "cover"
+        },
+        "neverOverHook": {
+          "type": "boolean",
+          "default": true
+        },
+        "treatment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "grade": {
+              "enum": [
+                "inherit",
+                "none"
+              ],
+              "default": "inherit"
+            },
+            "scrim": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "pacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hints consumed by plan.py when it drafts the mechanical cut. A style that holds on the action needs a different silence floor from one that cuts on the beat.",
+      "properties": {
+        "maxSilenceSeconds": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 3,
+          "default": 0.5
+        },
+        "fillerAggression": {
+          "enum": [
+            "off",
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "medium"
+        },
+        "payoffHoldSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0.4
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fontKey": {
+      "enum": [
+        "dm-sans",
+        "archivo",
+        "instrument-serif",
+        "inter",
+        "space-grotesk",
+        "caveat"
+      ],
+      "description": "Keys into the renderer's inlined font registry. NOT font names. Every family is injected eagerly as a data URI at module load -- three dynamic font-loading approaches have killed renders, and delayRender is not permitted."
+    },
+    "musicKey": {
+      "enum": [
+        "pulse-low",
+        "drive",
+        "warm-keys",
+        "soft-air",
+        "sparse-perc",
+        "lofi-warm"
+      ],
+      "description": "Keys into the renderer's bundled beds, resolved with staticFile()."
+    },
+    "tokenRef": {
+      "type": "string",
+      "pattern": "^@[a-zA-Z][a-zA-Z0-9]*$"
+    },
+    "colorRef": {
+      "description": "A literal colour, or @slot naming one of this pack's tokens.",
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+        },
+        {
+          "type": "string",
+          "pattern": "^rgba?\\("
+        },
+        {
+          "$ref": "#/$defs/tokenRef"
+        }
+      ]
+    },
+    "tokenRefOrFontKey": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/tokenRef"
+        },
+        {
+          "$ref": "#/$defs/fontKey"
+        }
+      ]
+    },
+    "rgbTriplet": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number",
+        "minimum": -1,
+        "maximum": 2
+      }
+    },
+    "tokenSlot": {
+      "type": "object",
+      "required": [
+        "kind",
+        "from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Dotted path into the brand, e.g. brand.accent or brand.palette[role=surface].hex"
+        },
+        "fallback": {
+          "description": "Used when the brand leaves the field empty. An empty string counts as unset -- the brand table defaults these to '' rather than NULL, which is the most common binding bug."
+        },
+        "kind": {
+          "enum": [
+            "color",
+            "fontKey",
+            "asset",
+            "text"
+          ]
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contrastAgainst": {
+          "type": "string"
+        },
+        "minRatio": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 21
+        },
+        "distinctFrom": {
+          "type": "string",
+          "description": "A second, different constraint from contrastAgainst. That one asks 'is this legible over the footage'; this one asks 'is it TELLABLE APART from the colour beside it'. A white brand accent clears 21:1 against black and is still invisible as a karaoke highlight next to white idle words, which is the single most common way a caption treatment fails. Measured as Oklab distance rather than a contrast ratio: contrast ratio is a LUMINANCE measure, and it reads a yellow highlight beside white text as 1.30:1 -- nearly identical -- when the difference a viewer sees is hue."
+        },
+        "autoFlip": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Candidates tried in order when the brand's own value fails minRatio. This is what makes 'looks right for any brand' true rather than aspirational -- a pale accent gets a legible caption instead of white on white."
+        },
+        "onMissing": {
+          "enum": [
+            "fallback",
+            "omit",
+            "error"
+          ],
+          "default": "fallback"
+        },
+        "minDistance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Oklab distance. Two spellings of white are ~0.02 apart, #EEEEEE and white ~0.05, and any accent worth calling one is above 0.18."
+        }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "edge": {
+          "enum": [
+            "top",
+            "bottom",
+            "top-left",
+            "bottom-left",
+            "center"
+          ]
+        },
+        "offset": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          ]
+        },
+        "insetX": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 400
+        }
+      }
+    },
+    "captionBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "fill": {
+          "$ref": "#/$defs/colorRef"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "padX": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 80
+        },
+        "padY": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 80
+        },
+        "scope": {
+          "enum": [
+            "active-word",
+            "line"
+          ],
+          "default": "line"
+        }
+      }
+    },
+    "enterExit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "enum": [
+            "none",
+            "fade",
+            "rise",
+            "pop",
+            "blur-in"
+          ],
+          "default": "none"
+        },
+        "distance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        }
+      }
+    },
+    "scrimEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "gradient",
+            "solid"
+          ],
+          "default": "none"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1920
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "An unknown preset degrades to none with a warning rather than throwing: an uglier reel beats a dead render. Fail-fast lives one level up, at minRendererVersion.",
+      "properties": {
+        "preset": {
+          "enum": [
+            "none",
+            "flash",
+            "whip",
+            "zoom-punch",
+            "blur-pulse",
+            "film-burn"
+          ],
+          "default": "none"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "intensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "headline": {
+      "description": "null means the block is off -- either the style never wanted it, or resolve_style switched it off because the brand had no asset. Drawing it empty instead would leave an endcard still claiming its duration.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "family": {
+              "$ref": "#/$defs/tokenRefOrFontKey"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            },
+            "weight": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 900
+            },
+            "case": {
+              "enum": [
+                "upper",
+                "lower",
+                "sentence",
+                "as-written"
+              ]
+            },
+            "color": {
+              "$ref": "#/$defs/colorRef"
+            },
+            "anchor": {
+              "$ref": "#/$defs/anchor"
+            },
+            "holdSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "animation": {
+              "$ref": "#/$defs/enterExit"
+            }
+          }
+        }
+      ]
+    },
+    "logoBug": {
+      "description": "null means the block is off -- either the style never wanted it, or resolve_style switched it off because the brand had no asset. Drawing it empty instead would leave an endcard still claiming its duration.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "asset": {
+              "$ref": "#/$defs/tokenRef"
+            },
+            "corner": {
+              "enum": [
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "size": {
+              "type": "number",
+              "minimum": 8,
+              "maximum": 400
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "inset": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stepLabels": {
+      "description": "null means the block is off -- either the style never wanted it, or resolve_style switched it off because the brand had no asset. Drawing it empty instead would leave an endcard still claiming its duration.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Numbered step badges. `source: segment.beat` reads the beat name the cut plan already carries; a script's '# Step 2 :: Pat it dry' heading supplies the label directly.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "source": {
+              "enum": [
+                "segment.beat",
+                "script.label",
+                "index"
+              ]
+            },
+            "format": {
+              "type": "string"
+            },
+            "family": {
+              "$ref": "#/$defs/tokenRefOrFontKey"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 120
+            },
+            "color": {
+              "$ref": "#/$defs/colorRef"
+            },
+            "anchor": {
+              "$ref": "#/$defs/anchor"
+            }
+          }
+        }
+      ]
+    },
+    "lowerThird": {
+      "description": "null means the block is off -- either the style never wanted it, or resolve_style switched it off because the brand had no asset. Drawing it empty instead would leave an endcard still claiming its duration.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "source": {
+              "type": "string"
+            },
+            "family": {
+              "$ref": "#/$defs/tokenRefOrFontKey"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 120
+            },
+            "color": {
+              "$ref": "#/$defs/colorRef"
+            },
+            "rule": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "width": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 20
+                },
+                "color": {
+                  "$ref": "#/$defs/colorRef"
+                }
+              }
+            },
+            "showSeconds": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "endcard": {
+      "description": "null when the brand has no endcard asset. Changes the reel's length, so verify_reel's expected duration accounts for it.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "asset": {
+              "$ref": "#/$defs/tokenRef"
+            },
+            "durationSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 15
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain"
+              ]
+            },
+            "background": {
+              "type": "string"
+            },
+            "audio": {
+              "enum": [
+                "duck",
+                "silence",
+                "continue"
+              ]
+            },
+            "onMissing": {
+              "enum": [
+                "omit",
+                "error"
+              ],
+              "default": "omit"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

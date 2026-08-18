@@ -1,0 +1,990 @@
+{
+  "captions": [
+    {
+      "from": 0.0,
+      "to": 1.34,
+      "text": "Why does every edit",
+      "words": [
+        {
+          "from": 0.0,
+          "to": 0.56,
+          "text": "Why"
+        },
+        {
+          "from": 0.56,
+          "to": 0.8,
+          "text": "does"
+        },
+        {
+          "from": 0.8,
+          "to": 1.1,
+          "text": "every"
+        },
+        {
+          "from": 1.1,
+          "to": 1.34,
+          "text": "edit"
+        }
+      ]
+    },
+    {
+      "from": 1.34,
+      "to": 1.66,
+      "text": "take",
+      "words": [
+        {
+          "from": 1.34,
+          "to": 1.66,
+          "text": "take"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "offset": 0.0,
+      "duration": 1.34,
+      "beat": "hook",
+      "kind": "structural"
+    },
+    {
+      "offset": 1.34,
+      "duration": 0.86,
+      "beat": "pat it dry",
+      "kind": "structural",
+      "label": "Pat it dry"
+    }
+  ],
+  "styles": {
+    "impact": {
+      "id": "impact",
+      "version": 1,
+      "name": "Impact",
+      "summary": "Punchy and dynamic. Hard cuts, heavy uppercase, aggressive punch-ins. For hooks and ads.",
+      "tags": [
+        "bold",
+        "ads",
+        "motivation"
+      ],
+      "canvases": [
+        "portrait"
+      ],
+      "sourceFit": {
+        "portrait": "cover",
+        "landscape": "letterbox-blur"
+      },
+      "minRendererVersion": 2,
+      "capabilities": [
+        "grade",
+        "zoom",
+        "transitions",
+        "music",
+        "furniture"
+      ],
+      "tokens": {
+        "accent": {
+          "from": "brand.accent",
+          "fallback": "#FFE14D",
+          "kind": "color",
+          "contrastAgainst": "#000000",
+          "minRatio": 4.5,
+          "autoFlip": [
+            "#FFE14D",
+            "#00E0FF"
+          ],
+          "onMissing": "fallback"
+        },
+        "ink": {
+          "from": "brand.foreground_color",
+          "fallback": "#FFFFFF",
+          "kind": "color"
+        },
+        "surface": {
+          "from": "brand.palette[role=surface].hex",
+          "fallback": "#0B0B0B",
+          "kind": "color"
+        },
+        "captionFamily": {
+          "from": "brand.caption_font",
+          "fallback": "archivo",
+          "kind": "fontKey",
+          "allow": [
+            "archivo",
+            "inter",
+            "dm-sans"
+          ]
+        },
+        "headingFamily": {
+          "from": "brand.heading_font",
+          "fallback": "archivo",
+          "kind": "fontKey"
+        },
+        "logo": {
+          "from": "brand.mark_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        },
+        "endcard": {
+          "from": "brand.endcard_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        }
+      },
+      "grade": {
+        "exposure": 0.04,
+        "contrast": 1.14,
+        "saturation": 1.22,
+        "temperature": 8,
+        "tint": -2,
+        "lift": [
+          0.0,
+          0.0,
+          0.01
+        ],
+        "gain": [
+          1.03,
+          1.0,
+          0.97
+        ],
+        "vignette": 0.2,
+        "sharpen": 0.35,
+        "grain": 0.0
+      },
+      "captions": {
+        "mode": "word-highlight",
+        "grouping": {
+          "maxWords": 3,
+          "maxSeconds": 1.2,
+          "breakOnPunctuation": true
+        },
+        "family": "archivo",
+        "weight": 800,
+        "size": {
+          "portrait": 96
+        },
+        "case": "upper",
+        "tracking": -0.02,
+        "lineHeight": 1.02,
+        "align": "center",
+        "anchor": {
+          "edge": "bottom",
+          "offset": 470,
+          "insetX": 48
+        },
+        "safeArea": "reels",
+        "colors": {
+          "idle": "#FFFFFF",
+          "active": "#D8772C",
+          "idleOpacity": 1.0
+        },
+        "box": {
+          "enabled": true,
+          "fill": "#0B0B0B",
+          "opacity": 0.85,
+          "radius": 12,
+          "padX": 20,
+          "padY": 6,
+          "scope": "active-word"
+        },
+        "stroke": {
+          "width": 8,
+          "color": "#000000"
+        },
+        "shadow": {
+          "blur": 10,
+          "y": 3,
+          "color": "rgba(0,0,0,0.55)"
+        },
+        "animation": {
+          "preset": "pop",
+          "activeScale": 1.16,
+          "spring": {
+            "damping": 13,
+            "stiffness": 220,
+            "mass": 0.55
+          },
+          "enter": {
+            "preset": "rise",
+            "distance": 26,
+            "durationMs": 110
+          },
+          "exit": {
+            "preset": "none"
+          }
+        }
+      },
+      "scrim": {
+        "top": {
+          "mode": "none"
+        },
+        "bottom": {
+          "mode": "gradient",
+          "height": 820,
+          "from": "rgba(0,0,0,0.78)",
+          "to": "rgba(0,0,0,0)"
+        }
+      },
+      "zoom": {
+        "mode": "beat",
+        "baseScale": 1.03,
+        "maxScale": 1.18,
+        "anchor": "upper-third",
+        "onSegmentStart": {
+          "scaleFrom": 1.18,
+          "scaleTo": 1.03,
+          "durationMs": 400,
+          "easing": "outCubic",
+          "applyTo": [
+            "structural"
+          ]
+        },
+        "drift": {
+          "perSecond": 0.005
+        }
+      },
+      "transitions": {
+        "atSegmentBoundary": {
+          "structural": {
+            "preset": "whip",
+            "durationMs": 170,
+            "intensity": 0.75
+          },
+          "mechanical": {
+            "preset": "none"
+          }
+        },
+        "atHook": {
+          "preset": "zoom-punch",
+          "durationMs": 260
+        },
+        "overlay": {
+          "preset": "none"
+        },
+        "totalOverlapSeconds": 0
+      },
+      "furniture": {
+        "headline": {
+          "enabled": true,
+          "family": "dm-sans",
+          "size": 68,
+          "weight": 800,
+          "case": "upper",
+          "color": "#FFFFFF",
+          "anchor": {
+            "edge": "top",
+            "offset": 120
+          },
+          "holdSeconds": 2.6,
+          "animation": {
+            "preset": "rise",
+            "durationMs": 240
+          }
+        },
+        "logoBug": null,
+        "stepLabels": {
+          "enabled": false
+        },
+        "lowerThird": {
+          "enabled": false
+        },
+        "endcard": null
+      },
+      "audio": {
+        "music": {
+          "track": "drive",
+          "gainDb": -26,
+          "fadeInMs": 350,
+          "fadeOutMs": 1200,
+          "loop": true
+        },
+        "duck": {
+          "enabled": true,
+          "amountDb": -9,
+          "attackMs": 80,
+          "releaseMs": 320,
+          "source": "speechEnvelope"
+        }
+      },
+      "broll": {
+        "density": "med",
+        "maxClipSeconds": 2.5,
+        "minGapSeconds": 6,
+        "fit": "cover",
+        "neverOverHook": true,
+        "treatment": {
+          "grade": "inherit",
+          "scrim": false
+        }
+      },
+      "pacing": {
+        "maxSilenceSeconds": 0.22,
+        "fillerAggression": "high",
+        "payoffHoldSeconds": 0.2
+      },
+      "render": {
+        "canvas": "portrait",
+        "width": 1080,
+        "height": 1920,
+        "stageWidth": 1274,
+        "tokens": {
+          "accent": "#D8772C",
+          "ink": "#FFFFFF",
+          "surface": "#0B0B0B",
+          "captionFamily": "archivo",
+          "headingFamily": "dm-sans",
+          "logo": null,
+          "endcard": null
+        },
+        "assets": []
+      }
+    },
+    "linen": {
+      "id": "linen",
+      "version": 1,
+      "name": "Linen",
+      "summary": "Calm and elevated. Serif captions, minimal movement, no music. For lifestyle and home.",
+      "tags": [
+        "minimal",
+        "lifestyle",
+        "premium"
+      ],
+      "canvases": [
+        "portrait",
+        "landscape"
+      ],
+      "sourceFit": {
+        "portrait": "cover",
+        "landscape": "cover"
+      },
+      "minRendererVersion": 2,
+      "capabilities": [
+        "grade",
+        "furniture"
+      ],
+      "tokens": {
+        "accent": {
+          "from": "brand.accent",
+          "fallback": "#C8B08A",
+          "kind": "color"
+        },
+        "ink": {
+          "from": "brand.foreground_color",
+          "fallback": "#F4F1EC",
+          "kind": "color"
+        },
+        "captionFamily": {
+          "from": "brand.caption_font",
+          "fallback": "instrument-serif",
+          "kind": "fontKey",
+          "allow": [
+            "instrument-serif",
+            "dm-sans"
+          ]
+        },
+        "headingFamily": {
+          "from": "brand.heading_font",
+          "fallback": "instrument-serif",
+          "kind": "fontKey"
+        },
+        "logo": {
+          "from": "brand.mark_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        },
+        "endcard": {
+          "from": "brand.endcard_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        }
+      },
+      "grade": {
+        "exposure": 0.02,
+        "contrast": 0.94,
+        "saturation": 0.82,
+        "temperature": -4,
+        "tint": 3,
+        "lift": [
+          0.02,
+          0.018,
+          0.014
+        ],
+        "gain": [
+          0.99,
+          0.99,
+          1.01
+        ],
+        "vignette": 0.1,
+        "sharpen": 0.0,
+        "grain": 0.04
+      },
+      "captions": {
+        "mode": "line-pop",
+        "grouping": {
+          "maxWords": 7,
+          "maxSeconds": 3.0,
+          "breakOnPunctuation": true
+        },
+        "family": "instrument-serif",
+        "weight": 400,
+        "size": {
+          "portrait": 52,
+          "landscape": 44
+        },
+        "case": "sentence",
+        "tracking": 0.0,
+        "lineHeight": 1.28,
+        "align": "left",
+        "anchor": {
+          "edge": "bottom",
+          "offset": 380,
+          "insetX": 88
+        },
+        "safeArea": "reels",
+        "colors": {
+          "idle": "#F4F1EC",
+          "active": "#F4F1EC",
+          "idleOpacity": 1.0
+        },
+        "box": {
+          "enabled": false
+        },
+        "stroke": {
+          "width": 0
+        },
+        "shadow": {
+          "blur": 18,
+          "y": 2,
+          "color": "rgba(0,0,0,0.35)"
+        },
+        "animation": {
+          "preset": "none",
+          "activeScale": 1.0,
+          "enter": {
+            "preset": "fade",
+            "durationMs": 260
+          },
+          "exit": {
+            "preset": "fade",
+            "durationMs": 200
+          }
+        }
+      },
+      "scrim": {
+        "top": {
+          "mode": "gradient",
+          "height": 300,
+          "from": "rgba(0,0,0,0.35)",
+          "to": "rgba(0,0,0,0)"
+        },
+        "bottom": {
+          "mode": "gradient",
+          "height": 640,
+          "from": "rgba(0,0,0,0.55)",
+          "to": "rgba(0,0,0,0)"
+        }
+      },
+      "zoom": {
+        "mode": "slow-drift",
+        "baseScale": 1.0,
+        "maxScale": 1.04,
+        "anchor": "center",
+        "drift": {
+          "perSecond": 0.0015
+        }
+      },
+      "transitions": {
+        "atSegmentBoundary": {
+          "structural": {
+            "preset": "none"
+          },
+          "mechanical": {
+            "preset": "none"
+          }
+        },
+        "atHook": {
+          "preset": "none"
+        },
+        "overlay": {
+          "preset": "none"
+        },
+        "totalOverlapSeconds": 0
+      },
+      "furniture": {
+        "headline": {
+          "enabled": true,
+          "family": "dm-sans",
+          "size": 56,
+          "weight": 400,
+          "case": "sentence",
+          "color": "#F4F1EC",
+          "anchor": {
+            "edge": "top",
+            "offset": 140
+          },
+          "holdSeconds": 4.0,
+          "animation": {
+            "preset": "fade",
+            "durationMs": 400
+          }
+        },
+        "logoBug": null,
+        "stepLabels": {
+          "enabled": false
+        },
+        "lowerThird": {
+          "enabled": true,
+          "source": "job.speaker",
+          "family": "dm-sans",
+          "size": 34,
+          "color": "#D8772C",
+          "rule": {
+            "width": 2,
+            "color": "#D8772C"
+          },
+          "showSeconds": [
+            1.2,
+            5.0
+          ]
+        },
+        "endcard": null
+      },
+      "audio": {
+        "music": null,
+        "duck": {
+          "enabled": false
+        }
+      },
+      "broll": {
+        "density": "none"
+      },
+      "pacing": {
+        "maxSilenceSeconds": 0.55,
+        "fillerAggression": "medium",
+        "payoffHoldSeconds": 0.5
+      },
+      "render": {
+        "canvas": "portrait",
+        "width": 1080,
+        "height": 1920,
+        "stageWidth": 1124,
+        "tokens": {
+          "accent": "#D8772C",
+          "ink": "#F4F1EC",
+          "captionFamily": "instrument-serif",
+          "headingFamily": "dm-sans",
+          "logo": null,
+          "endcard": null
+        },
+        "assets": []
+      }
+    },
+    "legacy-karaoke": {
+      "version": 1,
+      "minRendererVersion": 2,
+      "canvases": [
+        "portrait",
+        "landscape"
+      ],
+      "sourceFit": {
+        "portrait": "cover",
+        "landscape": "letterbox-blur"
+      },
+      "capabilities": [],
+      "tokens": {
+        "accent": {
+          "from": "brand.accent",
+          "fallback": "#FFFFFF",
+          "kind": "color"
+        },
+        "ink": {
+          "from": "brand.foreground_color",
+          "fallback": "#FFFFFF",
+          "kind": "color"
+        }
+      },
+      "scrim": {
+        "top": {
+          "mode": "gradient",
+          "height": 380,
+          "from": "rgba(0,0,0,0.72)",
+          "to": "rgba(0,0,0,0)"
+        },
+        "bottom": {
+          "mode": "gradient",
+          "height": 750,
+          "from": "rgba(0,0,0,0.72)",
+          "to": "rgba(0,0,0,0)"
+        }
+      },
+      "furniture": {
+        "headline": {
+          "enabled": true,
+          "family": "dm-sans",
+          "size": 62,
+          "weight": 700,
+          "case": "as-written",
+          "color": "#FFFFFF",
+          "anchor": {
+            "edge": "top",
+            "offset": 96
+          },
+          "holdSeconds": 0
+        },
+        "logoBug": null,
+        "stepLabels": {
+          "enabled": false
+        },
+        "lowerThird": {
+          "enabled": false
+        },
+        "endcard": null
+      },
+      "audio": {
+        "music": null,
+        "duck": {
+          "enabled": false
+        }
+      },
+      "broll": {
+        "density": "none"
+      },
+      "id": "legacy-karaoke",
+      "name": "Karaoke (legacy)",
+      "summary": "The original treatment: the brand accent highlights the active word.",
+      "tags": [
+        "legacy"
+      ],
+      "captions": {
+        "family": "dm-sans",
+        "weight": 700,
+        "size": {
+          "portrait": 58,
+          "landscape": 58
+        },
+        "case": "lower",
+        "tracking": -0.008620689655172414,
+        "lineHeight": 1.14,
+        "align": "center",
+        "anchor": {
+          "edge": "bottom",
+          "offset": 430,
+          "insetX": 54
+        },
+        "safeArea": "reels",
+        "box": {
+          "enabled": false
+        },
+        "stroke": {
+          "width": 0
+        },
+        "shadow": [
+          {
+            "blur": 10,
+            "y": 2,
+            "color": "rgba(0,0,0,0.55)"
+          },
+          {
+            "blur": 3,
+            "y": 1,
+            "color": "rgba(0,0,0,0.7)"
+          }
+        ],
+        "animation": {
+          "preset": "none",
+          "activeScale": 1
+        },
+        "grouping": {
+          "maxWords": 5,
+          "maxSeconds": 2.4,
+          "breakOnPunctuation": true
+        },
+        "mode": "word-highlight",
+        "colors": {
+          "idle": "#FFFFFF",
+          "active": "#D8772C",
+          "idleOpacity": 0.82
+        }
+      },
+      "render": {
+        "canvas": "portrait",
+        "width": 1080,
+        "height": 1920,
+        "stageWidth": 1080,
+        "tokens": {
+          "accent": "#D8772C",
+          "ink": "#FFFFFF"
+        },
+        "assets": []
+      }
+    },
+    "furniture-demo": {
+      "id": "furniture-demo",
+      "version": 1,
+      "name": "Linen",
+      "summary": "Calm and elevated. Serif captions, minimal movement, no music. For lifestyle and home.",
+      "tags": [
+        "minimal",
+        "lifestyle",
+        "premium"
+      ],
+      "canvases": [
+        "portrait",
+        "landscape"
+      ],
+      "sourceFit": {
+        "portrait": "cover",
+        "landscape": "cover"
+      },
+      "minRendererVersion": 2,
+      "capabilities": [
+        "grade",
+        "furniture"
+      ],
+      "tokens": {
+        "accent": {
+          "from": "brand.accent",
+          "fallback": "#C8B08A",
+          "kind": "color"
+        },
+        "ink": {
+          "from": "brand.foreground_color",
+          "fallback": "#F4F1EC",
+          "kind": "color"
+        },
+        "captionFamily": {
+          "from": "brand.caption_font",
+          "fallback": "instrument-serif",
+          "kind": "fontKey",
+          "allow": [
+            "instrument-serif",
+            "dm-sans"
+          ]
+        },
+        "headingFamily": {
+          "from": "brand.heading_font",
+          "fallback": "instrument-serif",
+          "kind": "fontKey"
+        },
+        "logo": {
+          "from": "brand.mark_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        },
+        "endcard": {
+          "from": "brand.endcard_asset_id",
+          "fallback": null,
+          "kind": "asset",
+          "onMissing": "omit"
+        }
+      },
+      "grade": {
+        "exposure": 0.02,
+        "contrast": 0.94,
+        "saturation": 0.82,
+        "temperature": -4,
+        "tint": 3,
+        "lift": [
+          0.02,
+          0.018,
+          0.014
+        ],
+        "gain": [
+          0.99,
+          0.99,
+          1.01
+        ],
+        "vignette": 0.1,
+        "sharpen": 0.0,
+        "grain": 0.04
+      },
+      "captions": {
+        "mode": "line-pop",
+        "grouping": {
+          "maxWords": 7,
+          "maxSeconds": 3.0,
+          "breakOnPunctuation": true
+        },
+        "family": "instrument-serif",
+        "weight": 400,
+        "size": {
+          "portrait": 52,
+          "landscape": 44
+        },
+        "case": "sentence",
+        "tracking": 0.0,
+        "lineHeight": 1.28,
+        "align": "left",
+        "anchor": {
+          "edge": "bottom",
+          "offset": 380,
+          "insetX": 88
+        },
+        "safeArea": "reels",
+        "colors": {
+          "idle": "#F4F1EC",
+          "active": "#F4F1EC",
+          "idleOpacity": 1.0
+        },
+        "box": {
+          "enabled": false
+        },
+        "stroke": {
+          "width": 0
+        },
+        "shadow": {
+          "blur": 18,
+          "y": 2,
+          "color": "rgba(0,0,0,0.35)"
+        },
+        "animation": {
+          "preset": "none",
+          "activeScale": 1.0,
+          "enter": {
+            "preset": "fade",
+            "durationMs": 260
+          },
+          "exit": {
+            "preset": "fade",
+            "durationMs": 200
+          }
+        }
+      },
+      "scrim": {
+        "top": {
+          "mode": "gradient",
+          "height": 300,
+          "from": "rgba(0,0,0,0.35)",
+          "to": "rgba(0,0,0,0)"
+        },
+        "bottom": {
+          "mode": "gradient",
+          "height": 640,
+          "from": "rgba(0,0,0,0.55)",
+          "to": "rgba(0,0,0,0)"
+        }
+      },
+      "zoom": {
+        "mode": "slow-drift",
+        "baseScale": 1.0,
+        "maxScale": 1.04,
+        "anchor": "center",
+        "drift": {
+          "perSecond": 0.0015
+        }
+      },
+      "transitions": {
+        "atSegmentBoundary": {
+          "structural": {
+            "preset": "whip",
+            "durationMs": 220,
+            "intensity": 0.7
+          },
+          "mechanical": {
+            "preset": "none"
+          }
+        }
+      },
+      "furniture": {
+        "headline": {
+          "enabled": true,
+          "family": "dm-sans",
+          "size": 56,
+          "weight": 400,
+          "case": "sentence",
+          "color": "#F4F1EC",
+          "anchor": {
+            "edge": "top",
+            "offset": 140
+          },
+          "holdSeconds": 4.0,
+          "animation": {
+            "preset": "fade",
+            "durationMs": 400
+          }
+        },
+        "logoBug": {
+          "asset": "lab/mark.png",
+          "corner": "bottom-left",
+          "size": 56,
+          "opacity": 0.7,
+          "inset": [
+            64,
+            300
+          ]
+        },
+        "stepLabels": {
+          "enabled": true,
+          "source": "script.label",
+          "format": "Step {n}/{total} \u00b7 {label}",
+          "family": "dm-sans",
+          "size": 34,
+          "color": "#D8772C",
+          "anchor": {
+            "edge": "top-left",
+            "offset": [
+              64,
+              240
+            ]
+          }
+        },
+        "lowerThird": {
+          "enabled": true,
+          "source": "job.speaker",
+          "text": "Kris Kwak",
+          "family": "dm-sans",
+          "size": 34,
+          "color": "#D8772C",
+          "rule": {
+            "width": 2,
+            "color": "#D8772C"
+          },
+          "showSeconds": [
+            0.4,
+            2.0
+          ]
+        },
+        "endcard": {
+          "asset": "lab/endcard.png",
+          "durationSeconds": 0.8,
+          "fit": "contain",
+          "background": "#0B0B0B",
+          "audio": "silence"
+        }
+      },
+      "audio": {
+        "music": null,
+        "duck": {
+          "enabled": false
+        }
+      },
+      "broll": {
+        "density": "none"
+      },
+      "pacing": {
+        "maxSilenceSeconds": 0.55,
+        "fillerAggression": "medium",
+        "payoffHoldSeconds": 0.5
+      },
+      "render": {
+        "canvas": "portrait",
+        "width": 1080,
+        "height": 1920,
+        "stageWidth": 1124,
+        "tokens": {
+          "accent": "#D8772C",
+          "ink": "#F4F1EC",
+          "captionFamily": "instrument-serif",
+          "headingFamily": "dm-sans",
+          "logo": null,
+          "endcard": null
+        },
+        "assets": []
+      }
+    }
+  }
+}
