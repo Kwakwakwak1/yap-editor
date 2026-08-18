@@ -63,17 +63,29 @@ def script_lines(text: str) -> List[Dict[str, Any]]:
     separate; a line that is only punctuation carries no tokens and is kept
     anyway, so indices line up with the shot list.
 
-    Markdown headings are dropped rather than treated as speech: `# Hook` is
-    structure, and aligning it would look for someone saying the word "hook".
+    Markdown headings are not treated as speech -- `# Hook` is structure, and
+    aligning it would go looking for someone saying the word "hook" -- but they
+    are not thrown away either. Each line carries the heading it sits under as
+    its `beat`, which is where a script-driven cut gets its beat names from
+    instead of inventing them. A script with no headings gives every line an
+    empty beat, which is a fact rather than a failure.
     """
     lines: List[Dict[str, Any]] = []
+    beat = ""
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if not line:
+            continue
+        if line.startswith("#"):
+            # `# Step 2 :: Pat it dry` -- the part before `::` is the beat, the
+            # part after is the on-screen label a tutorial style draws.
+            heading = line.lstrip("#").strip()
+            beat = heading.split("::")[0].strip().lower()
             continue
         lines.append({
             "index": len(lines) + 1,
             "line": line,
+            "beat": beat,
             "tokens": [t for t in (normalize_word(w) for w in line.split()) if t],
         })
     return lines
@@ -139,6 +151,7 @@ def align_take(
             results.append({
                 "index": line["index"],
                 "line": line["line"],
+                "beat": line.get("beat", ""),
                 "confidence": confidence,
                 "from": _time_of(words, absolute_start, "start"),
                 "to": _time_of(words, absolute_end - 1, "end"),
@@ -154,6 +167,7 @@ def align_take(
             results.append({
                 "index": line["index"],
                 "line": line["line"],
+                "beat": line.get("beat", ""),
                 "confidence": confidence,
                 "from": None,
                 "to": None,

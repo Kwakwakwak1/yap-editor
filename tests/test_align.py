@@ -58,6 +58,20 @@ class ScriptLines(unittest.TestCase):
         lines = script_lines("# Hook\nEveryone overcooks salmon.\n")
         self.assertEqual([line["line"] for line in lines], ["Everyone overcooks salmon."])
 
+    def test_a_line_carries_the_heading_it_sits_under(self):
+        # This is where a script-driven cut gets its beat names, instead of
+        # inventing them.
+        lines = script_lines(
+            "# Hook\nEveryone overcooks salmon.\n"
+            "# Step 1 :: Pat it dry\nPat the fillet completely dry.\n"
+        )
+        self.assertEqual([line["beat"] for line in lines], ["hook", "step 1"])
+
+    def test_a_script_with_no_headings_gives_every_line_an_empty_beat(self):
+        # A fact, not a failure: yap-writer's drafts are one spoken line per
+        # line with no headings at all.
+        self.assertEqual({line["beat"] for line in script_lines(SCRIPT)}, {""})
+
     def test_blank_lines_do_not_take_an_index(self):
         lines = script_lines("First line.\n\n\nSecond line.\n")
         self.assertEqual([line["index"] for line in lines], [1, 2])
