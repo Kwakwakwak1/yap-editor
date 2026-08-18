@@ -3,6 +3,7 @@ import {Composition} from "remotion";
 
 import {LandscapeOnBlack} from "./LandscapeOnBlack";
 import {PortraitFull} from "./PortraitFull";
+import {StyledReel} from "./StyledReel";
 import {LandscapeProps} from "./types";
 
 const defaultProps: LandscapeProps = {
@@ -31,6 +32,18 @@ export const Root: React.FC = () => {
       <Composition<any, LandscapeProps>
         id="LandscapeOnBlack"
         component={LandscapeOnBlack}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
+        defaultProps={defaultProps}
+        calculateMetadata={calculateMetadata}
+      />
+      {/* The parametric composition. The two above are kept until the legacy
+          packs are proven frame-identical against them, and are then dead. */}
+      <Composition<any, LandscapeProps>
+        id="StyledReel"
+        component={StyledReel as never}
         width={1080}
         height={1920}
         fps={30}

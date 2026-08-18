@@ -43,3 +43,17 @@ export type LandscapeProps = {
   durationInSeconds?: number;
   fps?: number;
 };
+
+/**
+ * What StyledReel receives.
+ *
+ * `style` is the resolved spec the API froze onto the job; `sourceOrientation`
+ * is the probe's reading of the footage, which selects the fit. They are
+ * separate on purpose -- the canvas is what the operator asked for, the fit is
+ * how the footage sits inside it, and collapsing the two is what made the
+ * composer's Aspect picker do nothing for months.
+ */
+export type StyledReelProps = LandscapeProps & {
+  style?: import("./style/types").ResolvedStyle;
+  sourceOrientation?: "portrait" | "landscape";
+};
