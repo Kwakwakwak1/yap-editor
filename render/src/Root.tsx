@@ -3,6 +3,7 @@ import {Composition} from "remotion";
 
 import {LandscapeOnBlack} from "./LandscapeOnBlack";
 import {PortraitFull} from "./PortraitFull";
+import {LAB_DEFAULTS, StyleLab, type StyleLabProps} from "./lab/StyleLab";
 import {StyledReel} from "./StyledReel";
 import {LandscapeProps} from "./types";
 
@@ -50,6 +51,17 @@ export const Root: React.FC = () => {
         durationInFrames={Math.round((defaultProps.durationInSeconds ?? 10) * 30)}
         defaultProps={defaultProps}
         calculateMetadata={calculateMetadata}
+      />
+      {/* Authoring only. Never rendered by the worker: it draws a committed
+          fixture, not a job. */}
+      <Composition<any, StyleLabProps>
+        id="StyleLab"
+        component={StyleLab as never}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={90}
+        defaultProps={LAB_DEFAULTS}
       />
       {/* Local addition: full-bleed variant for takes shot vertically. */}
       <Composition<any, LandscapeProps>

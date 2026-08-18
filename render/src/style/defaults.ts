@@ -67,16 +67,27 @@ export function withDefaults(style: ResolvedStyle | undefined): ResolvedStyle {
   };
 }
 
-/** `case` applied to a word. `as-written` is the identity, and is the default so
- *  a style must opt in to shouting. */
-export function applyCase(text: string, textCase: CaptionStyle["case"]): string {
+/**
+ * `case` applied to one word. `as-written` is the identity, and is the default,
+ * so a style must opt in to shouting.
+ *
+ * `isFirst` exists because captions are rendered word by word -- each one is its
+ * own element so the active one can be coloured and scaled. Sentence case
+ * applied to every word in that loop produces Title Case: "Why Does Every Edit"
+ * instead of "Why does every edit". Only the first word of a cue is capitalised.
+ */
+export function applyCase(
+  text: string,
+  textCase: CaptionStyle["case"],
+  isFirst = true,
+): string {
   switch (textCase) {
     case "upper":
       return text.toUpperCase();
     case "lower":
       return text.toLowerCase();
     case "sentence":
-      return text.charAt(0).toUpperCase() + text.slice(1);
+      return isFirst ? text.charAt(0).toUpperCase() + text.slice(1) : text;
     default:
       return text;
   }

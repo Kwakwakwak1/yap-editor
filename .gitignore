@@ -17,6 +17,10 @@ render/out/
 # git cannot un-ignore a file inside an ignored directory, so ignore the
 # contents rather than the directory itself — that keeps .gitkeep trackable
 render/public/reels/*
+# ...but the lab's fixture is committed: StyleLab has to work on a fresh clone,
+# before anything has been assembled, or authoring a style means running the
+# pipeline first.
+!render/public/lab/
 !render/public/reels/.gitkeep
 
 # python

@@ -137,7 +137,7 @@ export const Captions: React.FC<{captions: Caption[]; style: CaptionStyle}> = ({
               transform: scale === 1 ? undefined : `scale(${scale})`,
             }}
           >
-            {applyCase(word, style.case)}
+            {applyCase(word, style.case, index === 0)}
           </span>
         );
       })}
