@@ -29,6 +29,7 @@ from common import (
     video_pixel_format,
     write_json,
 )
+from grade import filter_string
 
 
 ENCODERS = {"libx264", "h264_videotoolbox", "h264_nvenc"}
@@ -296,6 +297,10 @@ def main() -> int:
         if pad_before < 0 or pad_after < 0:
             raise ValueError("pad values cannot be negative")
 
+        grade_filters = filter_string((plan.get("style") or {}).get("grade"))
+        if grade_filters:
+            print(f"Grading: {grade_filters}")
+
         print(f"Assembling {slug}: {len(segments)} segment(s), {fps} fps, width {args.width}")
         for index, segment in enumerate(segments, start=1):
             take_id = str(segment["take"])
@@ -314,7 +319,23 @@ def main() -> int:
                 "-ss", f"{padded_start:.3f}", "-i", str(source),
                 "-t", f"{padded_duration:.3f}",
                 "-map", "0:v:0", "-map", "0:a:0?",
-                "-vf", f"scale={args.width}:-2,fps={fps},format=yuv420p",
+                # The grade joins the chain that already runs, so it costs no
+                # extra pass -- and because cut.mp4 is also the preview, the
+                # preview shows the grade, which is the point of previewing a
+                # style before approving it.
+                #
+                # After scale, before format: grading at the output size means
+                # the same filter values look the same regardless of source
+                # resolution, and format=yuv420p must stay last so the pixel
+                # format verify.py checks is the one that lands.
+                "-vf", ",".join(
+                    part for part in (
+                        f"scale={args.width}:-2",
+                        f"fps={fps}",
+                        grade_filters,
+                        "format=yuv420p",
+                    ) if part
+                ),
                 "-c:v", args.encoder,
                 *encoder_args(args.encoder),
                 "-pix_fmt", "yuv420p",
