@@ -1,6 +1,13 @@
 import React from "react";
 import {AbsoluteFill, Audio, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
 
+// Imported for its side effect: the registry injects every bundled @font-face
+// at module load, and nothing else references it now that ./style/css owns the
+// family names. Dropping this import does not fail a build or a render -- it
+// silently renders every style in a system fallback, which is exactly how it
+// went unnoticed once before.
+import "./fonts/registry";
+
 import {Captions} from "./layers/Captions";
 import {Endcard} from "./layers/Endcard";
 import {Footage} from "./layers/Footage";
