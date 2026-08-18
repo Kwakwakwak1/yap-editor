@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
 
-import {boxFill} from "./Captions";
+import {boxFill} from "./css";
 
 describe("boxFill", () => {
   it("folds opacity into the colour rather than onto the element", () => {

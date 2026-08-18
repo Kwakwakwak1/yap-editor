@@ -1,7 +1,7 @@
 import React from "react";
 import {interpolate, useCurrentFrame, useVideoConfig} from "remotion";
 
-import {resolveFont} from "../fonts/registry";
+import {lowerThirdRuleStyle, lowerThirdStyle, lowerThirdTextStyle} from "../style/css";
 import type {LowerThird as LowerThirdSpec} from "../style/types";
 
 const FADE = 0.3;
@@ -34,42 +34,12 @@ export const LowerThird: React.FC<{spec?: LowerThirdSpec | null}> = ({spec}) => 
   );
   if (opacity <= 0) return null;
 
-  const size = spec.size ?? 34;
-  const rule = spec.rule ?? {};
+  const rule = lowerThirdRuleStyle(spec);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: 64,
-        bottom: 560,
-        maxWidth: 760,
-        opacity,
-        pointerEvents: "none",
-      }}
-    >
-      {rule.width ? (
-        <div
-          style={{
-            width: size * 1.8,
-            height: rule.width,
-            backgroundColor: rule.color ?? spec.color ?? "#ffffff",
-            marginBottom: size * 0.42,
-          }}
-        />
-      ) : null}
-      <div
-        style={{
-          fontFamily: resolveFont(spec.family),
-          fontSize: size,
-          fontWeight: 600,
-          lineHeight: 1.2,
-          color: spec.color ?? "#ffffff",
-          textShadow: "0 2px 10px rgba(0,0,0,0.55)",
-        }}
-      >
-        {spec.text}
-      </div>
+    <div style={lowerThirdStyle(spec, opacity)}>
+      {rule ? <div style={rule} /> : null}
+      <div style={lowerThirdTextStyle(spec)}>{spec.text}</div>
     </div>
   );
 };

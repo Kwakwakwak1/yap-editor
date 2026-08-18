@@ -88,6 +88,19 @@
       "default": "active",
       "description": "`hidden` keeps a pack resolvable for jobs already approved against it while keeping it out of the picker. The three legacy-* packs exist only to preserve the look of jobs created before the catalog did, and a carousel offering \"Legacy none\" as a choice is a catalog that lies about what it is for."
     },
+    "source": {
+      "enum": [
+        "catalog",
+        "brand",
+        "derived"
+      ],
+      "default": "catalog",
+      "description": "Where this pack came from. `catalog` is one of the shipped ten and is read-only -- editing one forks it. `brand` is a fork someone tuned for a particular brand, and it shadows the catalog pack of the same id for that brand only. `derived` is reserved for a pack inferred from a reference video."
+    },
+    "brand": {
+      "type": "string",
+      "description": "The brand slug a `brand` pack belongs to. Absent on a catalog pack. Duplicated into a column so the catalog can be queried by brand, and kept in the document so an exported pack still says what it is."
+    },
     "capabilities": {
       "type": "array",
       "default": [],

@@ -1,8 +1,7 @@
 import React from "react";
 import {interpolate, useCurrentFrame, useVideoConfig} from "remotion";
 
-import {resolveFont} from "../fonts/registry";
-import {applyCase} from "../style/defaults";
+import {applyCase, headlineStyle} from "../style/css";
 import type {Headline as HeadlineSpec} from "../style/types";
 
 /**
@@ -35,29 +34,8 @@ export const Headline: React.FC<{
   }
   if (opacity <= 0) return null;
 
-  const anchor = spec.anchor ?? {};
-  const offset = typeof anchor.offset === "number" ? anchor.offset : (anchor.offset?.[1] ?? 96);
-
   return (
-    <div
-      style={{
-        position: "absolute",
-        [anchor.edge === "bottom" ? "bottom" : "top"]: offset,
-        left: 60,
-        right: 60,
-        width: width - 120,
-        textAlign: "center",
-        fontFamily: resolveFont(spec.family),
-        fontSize: spec.size ?? 62,
-        fontWeight: spec.weight ?? 700,
-        color: spec.color ?? "#ffffff",
-        lineHeight: 1.16,
-        letterSpacing: -1,
-        textShadow: "0 2px 12px rgba(0,0,0,0.6)",
-        opacity,
-        pointerEvents: "none",
-      }}
-    >
+    <div style={headlineStyle(spec, width, opacity)}>
       {applyCase(text, spec.case)}
     </div>
   );

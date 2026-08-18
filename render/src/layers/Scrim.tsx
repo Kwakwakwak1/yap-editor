@@ -1,5 +1,6 @@
 import React from "react";
 
+import {scrimStyle} from "../style/css";
 import type {ScrimEdge} from "../style/types";
 
 /**
@@ -7,32 +8,14 @@ import type {ScrimEdge} from "../style/types";
  *
  * Its job is contrast: white text over arbitrary footage is unreadable without
  * something between them, and a scrim keeps the footage visible where a solid
- * bar would not.
+ * bar would not. The geometry lives in ../style/css so the style editor's
+ * preview draws the same band.
  */
 export const Scrim: React.FC<{edge: "top" | "bottom"; spec?: ScrimEdge; width: number}> = ({
   edge,
   spec,
   width,
 }) => {
-  if (!spec || spec.mode === "none" || !spec.height) return null;
-
-  const direction = edge === "top" ? "to bottom" : "to top";
-  const background =
-    spec.mode === "solid"
-      ? spec.from
-      : `linear-gradient(${direction}, ${spec.from}, ${spec.to})`;
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        [edge]: 0,
-        left: 0,
-        width,
-        height: spec.height,
-        background,
-        pointerEvents: "none",
-      }}
-    />
-  );
+  const style = scrimStyle(edge, spec, width);
+  return style ? <div style={style} /> : null;
 };

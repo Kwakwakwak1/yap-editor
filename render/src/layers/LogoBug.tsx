@@ -1,6 +1,7 @@
 import React from "react";
 import {Img, staticFile} from "remotion";
 
+import {logoBugStyle} from "../style/css";
 import type {LogoBug as LogoBugSpec} from "../style/types";
 
 /**
@@ -13,11 +14,6 @@ import type {LogoBug as LogoBugSpec} from "../style/types";
 export const LogoBug: React.FC<{spec?: LogoBugSpec | null}> = ({spec}) => {
   if (!spec || !spec.asset) return null;
 
-  const [insetX = 44, insetY = 44] = spec.inset ?? [];
-  const corner = spec.corner ?? "top-right";
-  const vertical = corner.startsWith("top") ? {top: insetY} : {bottom: insetY};
-  const horizontal = corner.endsWith("left") ? {left: insetX} : {right: insetX};
-
   // A staged path is relative to render/public/ and resolves through
   // staticFile(). An absolute URL is accepted so StyleLab can point at a live
   // asset while authoring, but the worker localises everything before a real
@@ -27,17 +23,6 @@ export const LogoBug: React.FC<{spec?: LogoBugSpec | null}> = ({spec}) => {
     : staticFile(spec.asset);
 
   return (
-    <Img
-      src={source}
-      style={{
-        position: "absolute",
-        ...vertical,
-        ...horizontal,
-        width: spec.size ?? 84,
-        height: "auto",
-        opacity: spec.opacity ?? 1,
-        pointerEvents: "none",
-      }}
-    />
+    <Img src={source} style={logoBugStyle(spec)} />
   );
 };
