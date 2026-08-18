@@ -261,6 +261,53 @@ def fillers(
     return found
 
 
+#: A piece of a segment shorter than this is not worth keeping: it is a frame
+#: or two of audio either side of a filler, and splicing it back in reads as a
+#: stutter rather than as continuity.
+MIN_PIECE_MS = 120
+
+
+def remove(
+    segments: Sequence[Dict[str, Any]], found: Sequence[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], int]:
+    """Cut fillers out of a segment list. Returns `(segments, removed)`.
+
+    A filler in a GAP between segments is already out of the cut and is not
+    counted -- reporting it would claim work that was not done, which is worse
+    than doing nothing, because it is the operator's only signal that the pass
+    is working. That is exactly what the first version of this did: it narrowed
+    boundaries the silence pass had already placed, announced "1 filler region
+    cut", and left an "um" sitting in the middle of a segment untouched.
+
+    A filler INSIDE a segment splits it in two. That is the case worth having:
+    "so um yeah" has no pause around the um for the silence pass to find, which
+    is why the um survives every other mechanical pass in this file.
+    """
+    out: List[Dict[str, Any]] = []
+    removed = 0
+
+    for segment in segments:
+        pieces = [dict(segment)]
+        for filler in found:
+            start, end = float(filler["from"]), float(filler["to"])
+            next_pieces: List[Dict[str, Any]] = []
+            for piece in pieces:
+                if end <= piece["start"] or start >= piece["end"]:
+                    next_pieces.append(piece)
+                    continue
+
+                removed += 1
+                head = dict(piece, end=round(min(start, piece["end"]), 3))
+                tail = dict(piece, start=round(max(end, piece["start"]), 3))
+                for candidate in (head, tail):
+                    if (candidate["end"] - candidate["start"]) * 1000 >= MIN_PIECE_MS:
+                        next_pieces.append(candidate)
+            pieces = next_pieces
+        out.extend(pieces)
+
+    return out, removed
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("media", type=Path)

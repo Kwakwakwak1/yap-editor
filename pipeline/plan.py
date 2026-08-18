@@ -154,6 +154,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--noise", default="-35dB")
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--marker", action="append", default=[])
+    parser.add_argument(
+        "--energy", action="store_true",
+        help="measure the take and use it: snap cuts to the quietest moment "
+             "near each boundary, and drop voiced regions the transcript says "
+             "are empty (um, uh). Needs --media.")
+    parser.add_argument(
+        "--energy-out", type=Path,
+        help="also write the measured envelope, for music ducking to reuse")
     return parser
 
 
@@ -228,6 +236,44 @@ def main() -> int:
             retained_pause = min(args.payoff_hold, gap_length)
             segments[boundary]["end"] = round(gap[1] - retained_pause, 3)
 
+    # The energy pass, if asked for. Deliberately opt-in: it is a second
+    # measurement of the media and it changes the cut, so a draft that did not
+    # ask for it gets exactly the cut word timestamps imply.
+    energy_report = ""
+    if args.energy and media:
+        from energy import envelope as build_envelope
+        from energy import fillers as find_fillers
+        from energy import measure as measure_energy
+        from energy import remove as remove_fillers
+        from energy import snap as snap_boundary
+
+        env = build_envelope(measure_energy(media))
+        if not env["levels"]:
+            print("Energy pass SKIPPED: no audio measured", file=sys.stderr)
+        else:
+            found = find_fillers(retained, env)
+            # Splits a segment around a filler inside it. A filler that landed
+            # in a gap is already out of the cut and is not counted -- the
+            # first version of this narrowed already-placed boundaries and
+            # announced a cut it had not made.
+            segments, removed = remove_fillers(segments, found)
+
+            # Snap last, so a boundary the filler pass just moved is snapped to
+            # the quiet either side of the sound that was removed.
+            for segment in segments:
+                segment["start"] = snap_boundary(segment["start"], env)
+                segment["end"] = snap_boundary(segment["end"], env)
+
+            if args.energy_out:
+                write_json(repo_path(str(args.energy_out)), env)
+            energy_report = (
+                f"Energy pass: floor {env['floor']:.1f} dBFS, speech "
+                f"{env['speech']:.1f} dBFS, {removed} of {len(found)} filler "
+                f"region(s) were inside the cut and were removed, "
+                f"every boundary snapped to the nearest quiet moment")
+    elif args.energy:
+        print("Energy pass SKIPPED: --energy needs --media", file=sys.stderr)
+
     word_gaps = []
     for left, right in zip(retained, retained[1:]):
         if float(right["start"]) - float(left["end"]) >= args.min_silence:
@@ -254,6 +300,8 @@ def main() -> int:
     write_json(output, output_payload)
     print(f"Wrote draft {safe_record_path(output)} with {len(segments)} mechanical segment(s)")
     print(f"Mechanical passes performed: flub resolution ({flub_count} retake(s), {filler_count} filler/marker sentence(s)) and silence pass")
+    if energy_report:
+        print(energy_report)
     print("Not done by plan.py: best-take selection, tangent trims, and hook surgery. Those are the human's job.")
     return 0
 

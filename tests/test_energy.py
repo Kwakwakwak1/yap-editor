@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "pipeline"))
 
 from energy import (  # noqa: E402
     envelope,
+    remove,
     fillers,
     snap,
     word_gaps,
@@ -154,3 +155,63 @@ class Fillers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RemoveFillers(unittest.TestCase):
+    """Cutting a filler out of a segment, rather than claiming to have."""
+
+    def test_a_filler_inside_a_segment_splits_it(self):
+        # The case worth having: "so um yeah" has no pause around the um for
+        # the silence pass to find, which is why it survives every other
+        # mechanical pass in plan.py.
+        segments = [{"take": "A", "start": 0.0, "end": 10.0, "kind": "mechanical"}]
+        out, removed = remove(segments, [{"from": 4.0, "to": 4.4}])
+
+        self.assertEqual(removed, 1)
+        self.assertEqual([(s["start"], s["end"]) for s in out], [(0.0, 4.0), (4.4, 10.0)])
+
+    def test_a_filler_in_a_gap_is_not_counted_as_removed(self):
+        # It was already out of the cut. Counting it announces work that was
+        # not done, which is worse than doing nothing -- the count is the
+        # operator's only signal that the pass works at all.
+        segments = [
+            {"take": "A", "start": 0.0, "end": 2.0},
+            {"take": "A", "start": 3.0, "end": 6.0},
+        ]
+        out, removed = remove(segments, [{"from": 2.3, "to": 2.7}])
+
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(out), 2)
+
+    def test_a_sliver_either_side_is_dropped_rather_than_spliced_back(self):
+        # 40ms of audio before a filler reads as a stutter, not continuity.
+        segments = [{"take": "A", "start": 0.0, "end": 5.0}]
+        out, _ = remove(segments, [{"from": 0.04, "to": 1.0}])
+        self.assertEqual([(s["start"], s["end"]) for s in out], [(1.0, 5.0)])
+
+    def test_two_fillers_in_one_segment_make_three_pieces(self):
+        segments = [{"take": "A", "start": 0.0, "end": 12.0}]
+        out, removed = remove(segments, [{"from": 3.0, "to": 3.4},
+                                         {"from": 8.0, "to": 8.5}])
+        self.assertEqual(removed, 2)
+        self.assertEqual(len(out), 3)
+
+    def test_a_segment_keeps_its_other_fields(self):
+        segments = [{"take": "B", "start": 0.0, "end": 6.0, "beat": "hook",
+                     "kind": "structural", "reason": "the question is the video"}]
+        out, _ = remove(segments, [{"from": 2.0, "to": 2.4}])
+        for piece in out:
+            self.assertEqual(piece["take"], "B")
+            self.assertEqual(piece["beat"], "hook")
+            self.assertEqual(piece["reason"], "the question is the video")
+
+    def test_no_fillers_returns_the_segments_unchanged(self):
+        segments = [{"take": "A", "start": 0.0, "end": 5.0}]
+        out, removed = remove(segments, [])
+        self.assertEqual(removed, 0)
+        self.assertEqual([(s["start"], s["end"]) for s in out], [(0.0, 5.0)])
+
+    def test_it_does_not_mutate_what_it_was_given(self):
+        segments = [{"take": "A", "start": 0.0, "end": 5.0}]
+        remove(segments, [{"from": 2.0, "to": 2.4}])
+        self.assertEqual(segments[0]["end"], 5.0)
