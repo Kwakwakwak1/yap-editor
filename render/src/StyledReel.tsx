@@ -1,11 +1,12 @@
 import React from "react";
-import {AbsoluteFill, Audio, staticFile} from "remotion";
+import {AbsoluteFill, Audio, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
 
 import {Captions} from "./layers/Captions";
 import {Footage} from "./layers/Footage";
 import {Headline} from "./layers/Headline";
 import {LogoBug} from "./layers/LogoBug";
 import {Scrim} from "./layers/Scrim";
+import {originFor, scaleAt} from "./layers/zoom";
 import {withDefaults} from "./style/defaults";
 import type {StyledReelProps} from "./types";
 
@@ -23,11 +24,15 @@ import type {StyledReelProps} from "./types";
  * brand is. `withDefaults` fills any field a older pack version omitted, so the
  * layers can read `style.captions.size.portrait` without guarding each access.
  *
- * Deliberately not here yet: grade (which belongs in ffmpeg, in assemble's
- * existing re-encode, rather than as a per-frame CSS filter in headless
- * Chrome), zoom, transitions, music and b-roll.
+ * Grade is deliberately NOT here: it belongs in ffmpeg, in assemble's existing
+ * re-encode, rather than as a per-frame CSS filter in headless Chrome -- and
+ * putting it there means the preview shows it too.
+ *
+ * Still to come: transitions, music and b-roll.
  */
 export const StyledReel: React.FC<StyledReelProps> = (props) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
   const style = withDefaults(props.style);
   const width = style.render?.width ?? 1080;
   const height = style.render?.height ?? 1920;
@@ -46,6 +51,8 @@ export const StyledReel: React.FC<StyledReelProps> = (props) => {
         width={width}
         height={height}
         fit={fit}
+        scale={scaleAt(style, props.segments, frame / fps)}
+        origin={originFor(style)}
       />
       {props.audio ? <Audio src={staticFile(props.audio)} /> : null}
 

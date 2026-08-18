@@ -14,7 +14,16 @@ export const Footage: React.FC<{
   width: number;
   height: number;
   fit?: string;
-}> = ({clip, muted, width, height, fit}) => {
+  /** 1 means no transform at all -- not a scale(1), which would still hand the
+   *  frame to the compositor and can shift sub-pixel sampling. */
+  scale?: number;
+  origin?: string;
+}> = ({clip, muted, width, height, fit, scale = 1, origin = "50% 50%"}) => {
+  const zoom =
+    scale === 1
+      ? undefined
+      : {transform: `scale(${scale})`, transformOrigin: origin};
+
   if (fit === "letterbox-blur" || fit === "contain") {
     // 16:9 inside 9:16, centred, matching LandscapeOnBlack's geometry.
     const bandHeight = Math.round((width / 16) * 9);
@@ -30,6 +39,7 @@ export const Footage: React.FC<{
             height: bandHeight,
             objectFit: "cover",
             display: "block",
+            ...zoom,
           }}
         />
       </div>
@@ -40,7 +50,7 @@ export const Footage: React.FC<{
     <OffthreadVideo
       src={staticFile(clip)}
       muted={muted}
-      style={{width, height, objectFit: "cover", display: "block"}}
+      style={{width, height, objectFit: "cover", display: "block", ...zoom}}
     />
   );
 };
