@@ -5,10 +5,10 @@
 //
 //   1. The headline is optional. Full-bleed footage rarely needs a second title
 //      competing with the captions, so an empty headline renders nothing at all.
-//   2. Captions highlight the active word. Cue timing is all that reaches the
-//      renderer, so word times are estimated within a cue proportionally to word
-//      length — cues are <=5 words and <=2.4s, so the drift is well under a
-//      frame or two and never accumulates across cues.
+//   2. Captions highlight the active word, using the measured per-word timings
+//      that assemble.py now writes into `captions[].words`. Props that predate
+//      that field fall back to estimating word times from character length; see
+//      `estimatedWords` for why that fallback is a last resort and not a peer.
 //   3. Captions sit clear of the platform's own chrome. Instagram and TikTok
 //      overlay the bottom ~250px of a 1920-tall frame with progress bar, handle,
 //      and buttons; anything below SAFE_BOTTOM risks being covered.
@@ -46,8 +46,19 @@ type PortraitProps = LandscapeProps & {
 /**
  * Split a cue into words with estimated start times, weighting each word by its
  * length. Whitespace is preserved by returning words and rendering with gaps.
+ *
+ * FALLBACK ONLY. This exists for props staged before `captions[].words` existed
+ * and for hand-written props; `wordsFor` prefers the measured timings.
+ *
+ * An earlier version of this comment claimed the drift was "well under a frame
+ * or two and never accumulates across cues". That was measured against the real
+ * sample and is false: the worst per-word error is ~370ms, or 11 frames at
+ * 30fps. Character length is simply not a proxy for how long a word is spoken —
+ * "why" is short and drawn out, "every" is long and fast. The estimate does not
+ * accumulate *across* cues, because each cue re-anchors to its own `from`, but
+ * within a cue it is more than enough to highlight the wrong word.
  */
-function timedWords(caption: Caption) {
+function estimatedWords(caption: Caption) {
   const words = caption.text.split(/\s+/).filter(Boolean);
   const span = Math.max(caption.to - caption.from, 0.001);
   const totalWeight = words.reduce((sum, w) => sum + w.length + 1, 0);
@@ -58,6 +69,18 @@ function timedWords(caption: Caption) {
     elapsed += share;
     return {word, start, end: caption.from + elapsed};
   });
+}
+
+/** Measured word timings when the pipeline supplied them, else the estimate. */
+function wordsFor(caption: Caption) {
+  if (caption.words && caption.words.length > 0) {
+    return caption.words.map((word) => ({
+      word: word.text,
+      start: word.from,
+      end: word.to,
+    }));
+  }
+  return estimatedWords(caption);
 }
 
 export const PortraitFull: React.FC<PortraitProps> = ({
@@ -150,7 +173,7 @@ export const PortraitFull: React.FC<PortraitProps> = ({
             pointerEvents: "none",
           }}
         >
-          {timedWords(activeCaption).map(({word, start, end}, i) => {
+          {wordsFor(activeCaption).map(({word, start, end}, i) => {
             const isActive = time >= start && time < end;
             return (
               <span

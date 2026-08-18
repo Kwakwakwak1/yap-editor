@@ -102,6 +102,95 @@ def write_json(path: Path, value: Any) -> None:
         handle.write("\n")
 
 
+def measure_loudness(path: Path, target_i: float, target_tp: float, target_lra: float) -> Dict[str, float]:
+    """Measure a file's loudness with ffmpeg's loudnorm analysis pass.
+
+    Returns the parsed measurement (`input_i`, `input_tp`, `input_lra`, ...).
+    Raises RuntimeError when loudnorm produced nothing parseable, so callers can
+    report that distinctly from a file that simply missed its target.
+
+    Shared by verify.py (the cut, tight tolerance) and verify_reel.py (the reel,
+    wider tolerance because a music bed legitimately shifts integrated loudness).
+    """
+    import json as _json
+    import re as _re
+    import subprocess as _subprocess
+
+    result = _subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-i", str(path), "-af",
+            f"loudnorm=I={target_i}:TP={target_tp}:LRA={target_lra}:print_format=json",
+            "-f", "null", "-",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    matches = _re.findall(r"\{\s*\"input_i\".*?\}", result.stderr, _re.DOTALL)
+    if not matches:
+        raise RuntimeError("loudnorm did not return measurement JSON")
+    try:
+        # The last block is the summary; earlier ones can appear per-stream.
+        return {key: float(value) for key, value in _json.loads(matches[-1]).items() if _is_number(value)}
+    except (TypeError, ValueError, _json.JSONDecodeError) as exc:
+        raise RuntimeError(f"could not parse loudnorm measurement: {exc}") from exc
+
+
+def _is_number(value: Any) -> bool:
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def map_words_to_timeline(
+    words_by_take: Dict[str, Sequence[Dict[str, Any]]],
+    segments: Iterable[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Project each take's word timings onto the assembled cut's timeline.
+
+    A segment keeps `[start, end)` of one take and lands at `offset` in the cut,
+    while `padded_start` marks where the extracted clip actually begins -- pad
+    is applied before the kept range, so a word moves by `offset - padded_start`.
+
+    Both assemble.py (building captions) and verify.py (diffing the rendered cut
+    against what was planned) need exactly this projection, and both carried
+    their own copy. They had already drifted: one clamped negative timestamps and
+    stripped whitespace, the other did neither. This is the single implementation.
+
+    Words are returned as `{from, to, text}` to match the caption cue shape the
+    renderer consumes.
+    """
+    output: List[Dict[str, Any]] = []
+    for segment in segments:
+        try:
+            start = float(segment["start"])
+            end = float(segment["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        # `.get` with defaults rather than direct indexing: verify.py tolerated a
+        # segment without offset/padded_start and assemble.py did not, so the
+        # permissive reading is the superset that keeps both callers working.
+        offset = float(segment.get("offset", 0.0))
+        padded_start = float(segment.get("padded_start", start))
+        shift = offset - padded_start
+        for word in words_by_take.get(str(segment["take"]), []):
+            try:
+                word_start = float(word["start"])
+                word_end = float(word["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if word_end <= start or word_start >= end:
+                continue
+            output.append({
+                "from": max(0.0, word_start + shift),
+                "to": max(0.0, word_end + shift),
+                "text": str(word.get("word", "")).strip(),
+            })
+    return output
+
+
 def normalize_word(value: str) -> str:
     import re
 

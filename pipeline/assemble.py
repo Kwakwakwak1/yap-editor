@@ -19,6 +19,7 @@ from common import (
     ffprobe_json,
     has_audio,
     load_json,
+    map_words_to_timeline,
     media_duration,
     repo_path,
     safe_record_path,
@@ -96,6 +97,56 @@ def sentence_end(word: str) -> bool:
     return bool(re.search(r"[.!?][\"')\]]*$", word))
 
 
+def render_segments(resolved_segments: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The per-segment timeline the renderer needs, and nothing more.
+
+    `offset` and `duration` place each segment on the cut's timeline. `beat` and
+    `kind` are what a style keys off: a transition can punctuate *structural*
+    joins — where the edit made an editorial decision — while leaving
+    *mechanical* joins invisible, and a beat name can drive an on-screen label.
+    Both already exist in cuts.json, so this costs nothing to carry.
+
+    The editorial `reason` is deliberately excluded. It exists for the human at
+    the approval gate, it is long free text, and the renderer has no use for it.
+    """
+    return [
+        {
+            "offset": round(float(segment.get("offset", 0.0)), 3),
+            "duration": round(float(segment.get("duration", 0.0)), 3),
+            "beat": str(segment.get("beat", "")),
+            # Matches the default used when this is printed for the operator, so
+            # a segment without an explicit kind reads the same in both places.
+            "kind": str(segment.get("kind", "mechanical")),
+        }
+        for segment in resolved_segments
+    ]
+
+
+def caption_cue(words: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Build one cue, carrying the real per-word timings alongside the joined text.
+
+    The word times are measured -- transcribe.py always runs with
+    `word_timestamps=True` -- but this function used to emit only `text`, so the
+    renderer re-derived them by weighting each word's character length across the
+    cue span. Every word-level caption effect was therefore an approximation of
+    data we already had. `words` is additive: `from`, `to` and `text` are
+    unchanged, so captions.srt and any existing consumer are unaffected.
+    """
+    return {
+        "from": round(words[0]["from"], 3),
+        "to": round(words[-1]["to"], 3),
+        "text": " ".join(item["text"] for item in words),
+        "words": [
+            {
+                "from": round(item["from"], 3),
+                "to": round(item["to"], 3),
+                "text": item["text"],
+            }
+            for item in words
+        ],
+    }
+
+
 def format_srt_time(seconds: float) -> str:
     milliseconds = max(0, int(round(seconds * 1000)))
     hours, remainder = divmod(milliseconds, 3_600_000)
@@ -124,53 +175,24 @@ def build_captions(
             continue
         loaded[str(take_id)] = caption_words(words_path)
 
-    mapped: List[Dict[str, Any]] = []
-    for segment in resolved_segments:
-        source_words = loaded.get(str(segment["take"]), [])
-        start, end = float(segment["start"]), float(segment["end"])
-        padded_start = float(segment["padded_start"])
-        offset = float(segment["offset"])
-        for word in source_words:
-            try:
-                word_start, word_end = float(word["start"]), float(word["end"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if word_end <= start or word_start >= end:
-                continue
-            mapped.append({
-                "from": max(0.0, offset + word_start - padded_start),
-                "to": max(0.0, offset + word_end - padded_start),
-                "word": str(word.get("word", "")).strip(),
-            })
+    mapped = map_words_to_timeline(loaded, resolved_segments)
 
     cues: List[Dict[str, Any]] = []
     current: List[Dict[str, Any]] = []
     for word in mapped:
-        if not word["word"]:
+        if not word["text"]:
             continue
         would_exceed_words = len(current) >= max_words
         would_exceed_time = bool(current) and word["to"] - current[0]["from"] > max_seconds
         if current and (would_exceed_words or would_exceed_time):
-            cues.append({
-                "from": round(current[0]["from"], 3),
-                "to": round(current[-1]["to"], 3),
-                "text": " ".join(item["word"] for item in current),
-            })
+            cues.append(caption_cue(current))
             current = []
         current.append(word)
-        if sentence_end(word["word"]):
-            cues.append({
-                "from": round(current[0]["from"], 3),
-                "to": round(current[-1]["to"], 3),
-                "text": " ".join(item["word"] for item in current),
-            })
+        if sentence_end(word["text"]):
+            cues.append(caption_cue(current))
             current = []
     if current:
-        cues.append({
-            "from": round(current[0]["from"], 3),
-            "to": round(current[-1]["to"], 3),
-            "text": " ".join(item["word"] for item in current),
-        })
+        cues.append(caption_cue(current))
     return cues, skipped
 
 
@@ -324,6 +346,7 @@ def main() -> int:
                 "clip": f"reels/{slug}/clip.mp4",
                 "headline": str(plan.get("headline", "")),
                 "captions": cues,
+                "segments": render_segments(resolved_segments),
                 "durationInSeconds": round(final_duration, 3),
                 "fps": fps,
             }

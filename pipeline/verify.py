@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import json
-import re
 import shutil
 import subprocess
 import sys
@@ -14,39 +12,38 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from common import REPO_ROOT, display_path, ffprobe_json, load_json, media_duration, repo_path, run_command, video_pixel_format
+from common import (
+    REPO_ROOT,
+    display_path,
+    ffprobe_json,
+    load_json,
+    map_words_to_timeline,
+    measure_loudness,
+    media_duration,
+    normalize_word,
+    repo_path,
+    run_command,
+    video_pixel_format,
+)
 
 
 def print_result(name: str, status: str, detail: str) -> None:
     print(f"{name}: {status}{f' ({detail})' if detail else ''}")
 
 
-def normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9']+", "", value.lower())
-
-
 def planned_words(resolved: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The words the plan says the cut should contain, on the cut's own timeline.
+
+    The projection itself lives in common.map_words_to_timeline, shared with
+    assemble.py's caption builder -- the two copies had already drifted.
+    """
     words_by_take: Dict[str, List[Dict[str, Any]]] = {}
     for take_id, take in resolved.get("takes", {}).items():
         path_value = take.get("words")
         if path_value and repo_path(path_value).exists():
             data = load_json(repo_path(path_value))
             words_by_take[str(take_id)] = data.get("words", [])
-    output: List[Dict[str, Any]] = []
-    for segment in resolved.get("segments", []):
-        start, end = float(segment["start"]), float(segment["end"])
-        offset = float(segment.get("offset", 0.0))
-        padded_start = float(segment.get("padded_start", start))
-        for word in words_by_take.get(str(segment["take"]), []):
-            word_start, word_end = float(word["start"]), float(word["end"])
-            if word_end <= start or word_start >= end:
-                continue
-            output.append({
-                "word": str(word.get("word", "")),
-                "from": offset + word_start - padded_start,
-                "to": offset + word_end - padded_start,
-            })
-    return output
+    return map_words_to_timeline(words_by_take, resolved.get("segments", []))
 
 
 def find_backend() -> Optional[str]:
@@ -82,15 +79,15 @@ def run_join_check(cut: Path, resolved: Dict[str, Any], backend: str) -> Tuple[s
             actual_data = load_json(output_words)
         except (OSError, ValueError) as exc:
             return "FAIL", f"transcription output unreadable: {exc}"
-    expected_tokens = [normalize(item["word"]) for item in planned if normalize(item["word"])]
+    expected_tokens = [normalize_word(item["text"]) for item in planned if normalize_word(item["text"])]
     actual_items = actual_data.get("words", [])
-    actual_tokens = [normalize(str(item.get("word", ""))) for item in actual_items if normalize(str(item.get("word", "")))]
+    actual_tokens = [normalize_word(str(item.get("word", ""))) for item in actual_items if normalize_word(str(item.get("word", "")))]
     matcher = difflib.SequenceMatcher(a=expected_tokens, b=actual_tokens)
     dropped: List[str] = []
     doubled: List[str] = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag in ("delete", "replace"):
-            dropped.extend(f"{planned[i]['word']}@{planned[i]['from']:.3f}s" for i in range(i1, i2))
+            dropped.extend(f"{planned[i]['text']}@{planned[i]['from']:.3f}s" for i in range(i1, i2))
         if tag in ("insert", "replace"):
             doubled.extend(f"{actual_items[j].get('word', '')}@{float(actual_items[j].get('start', 0.0)):.3f}s" for j in range(j1, j2))
     if dropped or doubled:
@@ -106,24 +103,13 @@ def run_join_check(cut: Path, resolved: Dict[str, Any], backend: str) -> Tuple[s
 def loudness_check(cut: Path, resolved: Dict[str, Any]) -> Tuple[str, str]:
     loudness = resolved.get("loudness", {})
     target = float(loudness.get("i", -14))
-    result = subprocess.run(
-        [
-            "ffmpeg", "-hide_banner", "-i", str(cut), "-af",
-            f"loudnorm=I={target}:TP={float(loudness.get('tp', -1.5))}:LRA={float(loudness.get('lra', 11))}:print_format=json",
-            "-f", "null", "-",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    matches = re.findall(r"\{\s*\"input_i\".*?\}", result.stderr, re.DOTALL)
-    if not matches:
-        return "FAIL", "loudnorm did not return measurement JSON"
     try:
-        measurement = json.loads(matches[-1])
+        measurement = measure_loudness(
+            cut, target, float(loudness.get("tp", -1.5)), float(loudness.get("lra", 11))
+        )
         measured = float(measurement["input_i"])
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        return "FAIL", f"could not parse loudnorm measurement: {exc}"
+    except (KeyError, RuntimeError) as exc:
+        return "FAIL", str(exc)
     if abs(measured - target) > 1.0:
         return "FAIL", f"input_i={measured:.2f} LUFS, target={target:.2f} ±1"
     return "PASS", f"input_i={measured:.2f} LUFS, target={target:.2f} ±1"
