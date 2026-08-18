@@ -79,6 +79,11 @@ def run_join_check(cut: Path, resolved: Dict[str, Any], backend: str) -> Tuple[s
             actual_data = load_json(output_words)
         except (OSError, ValueError) as exc:
             return "FAIL", f"transcription output unreadable: {exc}"
+    # Diffed against the TRANSCRIPT, never against the script -- even when the
+    # job has one, and even though script_spelling.py may have respelled these
+    # cues. The script is what was meant; the transcript is what was said.
+    # Checking the cut against the script would flag every ad-lib as edit
+    # damage, which is the opposite of what this check is for.
     expected_tokens = [normalize_word(item["text"]) for item in planned if normalize_word(item["text"])]
     actual_items = actual_data.get("words", [])
     actual_tokens = [normalize_word(str(item.get("word", ""))) for item in actual_items if normalize_word(str(item.get("word", "")))]
