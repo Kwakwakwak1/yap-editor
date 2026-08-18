@@ -102,6 +102,26 @@ def sentence_end(word: str) -> bool:
     return bool(re.search(r"[.!?][\"')\]]*$", word))
 
 
+def caption_grouping(plan: Dict[str, Any], cli_words: int, cli_seconds: float) -> Tuple[int, float]:
+    """How many words a cue holds, and for how long.
+
+    The style decides this when it has an opinion: 3 words at 1.2s reads nothing
+    like 7 at 3.0s, and that difference is as much a part of a style as its
+    typeface. It was a CLI flag, which meant every style got whatever the worker
+    happened to pass.
+
+    The CLI values remain the default, so a plan with no style -- or a style
+    that declines to say -- assembles exactly as it always did.
+    """
+    grouping = (((plan.get("style") or {}).get("captions") or {}).get("grouping") or {})
+    words = grouping.get("maxWords")
+    seconds = grouping.get("maxSeconds")
+    return (
+        int(words) if isinstance(words, (int, float)) and words > 0 else cli_words,
+        float(seconds) if isinstance(seconds, (int, float)) and seconds > 0 else cli_seconds,
+    )
+
+
 def props_fingerprint(props: Dict[str, Any]) -> str:
     """A sha256 over everything in props except the fingerprint itself.
 
@@ -351,7 +371,9 @@ def main() -> int:
                 f"{float(segment['duration']):6.3f}s  offset {float(segment['offset']):6.3f}s"
             )
 
-        cues, skipped_takes = build_captions(plan, resolved_segments, args.caption_words, args.caption_max_seconds)
+        max_words, max_seconds = caption_grouping(
+            plan, args.caption_words, args.caption_max_seconds)
+        cues, skipped_takes = build_captions(plan, resolved_segments, max_words, max_seconds)
         write_captions(build_dir, cues)
         for take_id in skipped_takes:
             print(f"Captions skipped for take {take_id}: no words file")

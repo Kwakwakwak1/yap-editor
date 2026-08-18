@@ -235,3 +235,42 @@ class RenderSegments(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CaptionGrouping(unittest.TestCase):
+    """How many words a cue holds is part of the style, not a CLI flag.
+
+    Three words at 1.2s reads nothing like seven at 3.0s. It was an argument to
+    assemble.py, which meant every style got whatever the worker happened to
+    pass -- so a pack could declare a grouping and be silently ignored.
+    """
+
+    def test_the_style_decides_when_it_has_an_opinion(self):
+        from assemble import caption_grouping
+
+        plan = {"style": {"captions": {"grouping": {"maxWords": 3, "maxSeconds": 1.2}}}}
+        self.assertEqual(caption_grouping(plan, 5, 2.4), (3, 1.2))
+
+    def test_the_cli_default_survives_a_plan_with_no_style(self):
+        from assemble import caption_grouping
+
+        self.assertEqual(caption_grouping({}, 5, 2.4), (5, 2.4))
+
+    def test_a_style_that_declines_to_say_falls_back(self):
+        from assemble import caption_grouping
+
+        plan = {"style": {"captions": {}}}
+        self.assertEqual(caption_grouping(plan, 5, 2.4), (5, 2.4))
+
+    def test_a_partial_opinion_only_overrides_what_it_states(self):
+        from assemble import caption_grouping
+
+        plan = {"style": {"captions": {"grouping": {"maxWords": 3}}}}
+        self.assertEqual(caption_grouping(plan, 5, 2.4), (3, 2.4))
+
+    def test_a_nonsense_value_does_not_produce_an_empty_cue(self):
+        # maxWords 0 would loop forever or emit nothing; the CLI value wins.
+        from assemble import caption_grouping
+
+        plan = {"style": {"captions": {"grouping": {"maxWords": 0, "maxSeconds": -1}}}}
+        self.assertEqual(caption_grouping(plan, 5, 2.4), (5, 2.4))

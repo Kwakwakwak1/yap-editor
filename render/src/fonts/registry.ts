@@ -1,4 +1,9 @@
+import {ARCHIVO_WOFF2} from "../assets/archivo";
+import {CAVEAT_WOFF2} from "../assets/caveat";
 import {DM_SANS_WOFF2} from "../assets/dmsans";
+import {INSTRUMENT_SERIF_WOFF2} from "../assets/instrumentserif";
+import {INTER_WOFF2} from "../assets/inter";
+import {SPACE_GROTESK_WOFF2} from "../assets/spacegrotesk";
 
 /**
  * The bundled typeface registry.
@@ -46,17 +51,26 @@ export const FONT_REGISTRY: Record<FontKey, BundledFont> = {
     woff2: DM_SANS_WOFF2,
     weight: "100 1000",
   },
-  // Not yet inlined. Until the roster lands these fall back to a system stack
-  // with the right proportions, so a pack naming one renders imperfectly rather
-  // than not at all -- the same trade the swap window already makes.
-  archivo: {stack: '"Archivo", "Arial Narrow", Impact, sans-serif', weight: "100 900"},
+  archivo: {
+    stack: '"Archivo", "Arial Narrow", Impact, sans-serif',
+    woff2: ARCHIVO_WOFF2,
+    weight: "100 900",
+  },
   "instrument-serif": {
     stack: '"Instrument Serif", Georgia, "Times New Roman", serif',
+    woff2: INSTRUMENT_SERIF_WOFF2,
+    // One weight. A pack asking for bold gets a synthetic bold from the
+    // browser, which on a high-contrast serif looks smeared -- which is why
+    // the packs using it specify weight 400.
     weight: "400",
   },
-  inter: {stack: '"Inter", system-ui, sans-serif', weight: "100 900"},
-  "space-grotesk": {stack: '"Space Grotesk", "SF Mono", monospace', weight: "300 700"},
-  caveat: {stack: '"Caveat", "Comic Sans MS", cursive', weight: "400 700"},
+  inter: {stack: '"Inter", system-ui, sans-serif', woff2: INTER_WOFF2, weight: "100 900"},
+  "space-grotesk": {
+    stack: '"Space Grotesk", "SF Mono", monospace',
+    woff2: SPACE_GROTESK_WOFF2,
+    weight: "300 700",
+  },
+  caveat: {stack: '"Caveat", "Comic Sans MS", cursive', woff2: CAVEAT_WOFF2, weight: "400 700"},
 };
 
 const STYLE_ID = "style-pack-fonts";
