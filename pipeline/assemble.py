@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import sys
@@ -40,8 +42,11 @@ def number(value: Any, field: str) -> float:
 
 
 def validate_plan(plan: Dict[str, Any]) -> Tuple[str, int, Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
-    if plan.get("version") != 1:
-        raise ValueError("version must be 1")
+    # 2 adds the `style` block. 1 is still accepted: a plan written before style
+    # packs must keep assembling, and it simply stages props without a style,
+    # which the renderer treats as "use the defaults".
+    if plan.get("version") not in (1, 2):
+        raise ValueError("version must be 1 or 2")
     slug = plan.get("slug")
     if not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9-]+", slug):
         raise ValueError("slug must match [a-z0-9-]+")
@@ -95,6 +100,25 @@ def caption_words(path: Path) -> List[Dict[str, Any]]:
 
 def sentence_end(word: str) -> bool:
     return bool(re.search(r"[.!?][\"')\]]*$", word))
+
+
+def props_fingerprint(props: Dict[str, Any]) -> str:
+    """A sha256 over everything in props except the fingerprint itself.
+
+    The worker reads props back after staging and checks this. That read-back is
+    inherited from `patch_accent`, which existed because assemble never wrote
+    the accent and the worker had to patch it in afterwards -- but the check it
+    performed guarded a real and separate failure: the MiniKWork sparse image
+    can re-attach read-only, leaving an intact, stale, and entirely renderable
+    props.json on disk. A render from that file succeeds and publishes the wrong
+    look, which is the worst kind of failure because nothing reports it.
+
+    Patching is gone now that the style is written at source. The witness is
+    not, and it covers every field rather than one colour.
+    """
+    payload = {k: v for k, v in props.items() if k != "specHash"}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def render_segments(resolved_segments: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -350,7 +374,21 @@ def main() -> int:
                 "durationInSeconds": round(final_duration, 3),
                 "fps": fps,
             }
-            write_json(stage_dir / "props.json", props)
+            # The style travels inside cuts.json, which is the file that already
+            # holds every decision about this video -- one file reproduces one
+            # reel, and a second one to keep in sync would drift.
+            style = plan.get("style")
+            if isinstance(style, dict) and style:
+                props["style"] = style
+                source = style.get("render", {}).get("sourceOrientation")
+                if source:
+                    props["sourceOrientation"] = source
+            props["specHash"] = props_fingerprint(props)
+            # Written atomically: a half-written props.json is indistinguishable
+            # from a stale one to anything that reads it later.
+            temporary = stage_dir / "props.json.tmp"
+            write_json(temporary, props)
+            os.replace(temporary, stage_dir / "props.json")
             print(f"Staged renderer inputs at {display_path(stage_dir)}")
         else:
             print("Renderer staging skipped (--no-stage)")
