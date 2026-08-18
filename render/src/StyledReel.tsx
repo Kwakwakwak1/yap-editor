@@ -7,6 +7,7 @@ import {Headline} from "./layers/Headline";
 import {LogoBug} from "./layers/LogoBug";
 import {Scrim} from "./layers/Scrim";
 import {originFor, scaleAt} from "./layers/zoom";
+import {transitionAt, transitionStyle} from "./transitions/presets";
 import {withDefaults} from "./style/defaults";
 import type {StyledReelProps} from "./types";
 
@@ -45,6 +46,9 @@ export const StyledReel: React.FC<StyledReelProps> = (props) => {
 
   return (
     <AbsoluteFill style={{backgroundColor: "#000000"}}>
+      {/* Punctuation is applied to the FOOTAGE, not the whole frame: a whip
+          that dragged the captions with it would make the text unreadable at
+          exactly the moment it is being read. */}
       <Footage
         clip={props.clip}
         muted={Boolean(props.audio)}
@@ -53,6 +57,9 @@ export const StyledReel: React.FC<StyledReelProps> = (props) => {
         fit={fit}
         scale={scaleAt(style, props.segments, frame / fps)}
         origin={originFor(style)}
+        transition={transitionStyle(
+          transitionAt(style.transitions, props.segments, frame / fps),
+        )}
       />
       {props.audio ? <Audio src={staticFile(props.audio)} /> : null}
 

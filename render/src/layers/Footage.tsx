@@ -18,7 +18,10 @@ export const Footage: React.FC<{
    *  frame to the compositor and can shift sub-pixel sampling. */
   scale?: number;
   origin?: string;
-}> = ({clip, muted, width, height, fit, scale = 1, origin = "50% 50%"}) => {
+  /** Extra CSS from a transition. Empty when nothing is happening, so an
+   *  un-punctuated style adds no properties at all. */
+  transition?: React.CSSProperties;
+}> = ({clip, muted, width, height, fit, scale = 1, origin = "50% 50%", transition}) => {
   const zoom =
     scale === 1
       ? undefined
@@ -40,6 +43,7 @@ export const Footage: React.FC<{
             objectFit: "cover",
             display: "block",
             ...zoom,
+            ...transition,
           }}
         />
       </div>
@@ -50,7 +54,7 @@ export const Footage: React.FC<{
     <OffthreadVideo
       src={staticFile(clip)}
       muted={muted}
-      style={{width, height, objectFit: "cover", display: "block", ...zoom}}
+      style={{width, height, objectFit: "cover", display: "block", ...zoom, ...transition}}
     />
   );
 };

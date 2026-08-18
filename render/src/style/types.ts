@@ -120,6 +120,7 @@ export interface ResolvedStyle {
     lowerThird?: unknown | null;
     endcard?: Endcard | null;
   };
+  transitions?: import("../transitions/presets").TransitionsSpec;
   zoom?: import("../layers/zoom").ZoomSpec;
   render?: {
     canvas?: "portrait" | "landscape";
