@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "slug": "__style_sample__",
+  "fps": 30,
+  "headline": "the edit is not the hard part",
+  "pad": [
+    0.05,
+    0.05
+  ],
+  "loudness": {
+    "i": -14,
+    "tp": -1.5,
+    "lra": 11
+  },
+  "takes": {
+    "A": {
+      "path": "sample/reference-portrait.mp4",
+      "words": "sample/reference-portrait.words.json"
+    }
+  },
+  "segments": [
+    {
+      "take": "A",
+      "start": 0.0,
+      "end": 2.031,
+      "beat": "hook",
+      "kind": "structural",
+      "reason": "the reference is one line per beat, by construction"
+    },
+    {
+      "take": "A",
+      "start": 2.371,
+      "end": 5.465,
+      "beat": "answer",
+      "kind": "structural",
+      "reason": "the reference is one line per beat, by construction"
+    },
+    {
+      "take": "A",
+      "start": 5.805,
+      "end": 8.671,
+      "beat": "point",
+      "kind": "structural",
+      "reason": "the reference is one line per beat, by construction"
+    },
+    {
+      "take": "A",
+      "start": 9.011,
+      "end": 11.343,
+      "beat": "payoff",
+      "kind": "structural",
+      "reason": "the reference is one line per beat, by construction"
+    }
+  ]
+}
