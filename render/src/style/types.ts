@@ -17,7 +17,12 @@ export type AnimationPreset = "none" | "pop" | "rise" | "fade" | "blur-in" | "ty
 
 export interface Anchor {
   edge?: "top" | "bottom" | "top-left" | "bottom-left" | "center";
-  offset?: number | [number, number];
+  /**
+   * One number for the anchored edge, or [x, y]. A plain array rather than a
+   * tuple because these arrive from JSON, where TypeScript widens `[64, 240]`
+   * to `number[]` and a tuple type then rejects the whole fixture.
+   */
+  offset?: number | number[];
   insetX?: number;
 }
 
@@ -90,7 +95,26 @@ export interface LogoBug {
   corner?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
   size?: number;
   opacity?: number;
-  inset?: [number, number];
+  /** [x, y]. A plain array because it arrives from JSON. */
+  inset?: number[];
+}
+
+export interface LowerThird {
+  enabled?: boolean;
+  /**
+   * The dotted path the PACK declared ("job.speaker"). Kept for provenance;
+   * the renderer never resolves it.
+   */
+  source?: string;
+  /** What the API resolved that path to. Empty means draw nothing. */
+  text?: string | null;
+  family?: string;
+  size?: number;
+  color?: string;
+  rule?: {width?: number; color?: string};
+  /** [from, to] in seconds. A plain array because it arrives from JSON,
+   *  where a tuple type would fail to widen. */
+  showSeconds?: number[];
 }
 
 export interface Endcard {
@@ -116,8 +140,8 @@ export interface ResolvedStyle {
   furniture?: {
     headline?: Headline | null;
     logoBug?: LogoBug | null;
-    stepLabels?: unknown | null;
-    lowerThird?: unknown | null;
+    stepLabels?: import("../layers/steps").StepLabelsSpec | null;
+    lowerThird?: LowerThird | null;
     endcard?: Endcard | null;
   };
   transitions?: import("../transitions/presets").TransitionsSpec;

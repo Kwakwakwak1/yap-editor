@@ -13,7 +13,7 @@ import type {LogoBug as LogoBugSpec} from "../style/types";
 export const LogoBug: React.FC<{spec?: LogoBugSpec | null}> = ({spec}) => {
   if (!spec || !spec.asset) return null;
 
-  const [insetX, insetY] = spec.inset ?? [44, 44];
+  const [insetX = 44, insetY = 44] = spec.inset ?? [];
   const corner = spec.corner ?? "top-right";
   const vertical = corner.startsWith("top") ? {top: insetY} : {bottom: insetY};
   const horizontal = corner.endsWith("left") ? {left: insetX} : {right: insetX};

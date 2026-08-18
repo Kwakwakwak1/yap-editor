@@ -5,7 +5,8 @@ import {LandscapeOnBlack} from "./LandscapeOnBlack";
 import {PortraitFull} from "./PortraitFull";
 import {LAB_DEFAULTS, StyleLab, type StyleLabProps} from "./lab/StyleLab";
 import {StyledReel} from "./StyledReel";
-import {LandscapeProps} from "./types";
+import {reelDurationSeconds} from "./style/duration";
+import {LandscapeProps, StyledReelProps} from "./types";
 
 const defaultProps: LandscapeProps = {
   clip: "reels/sample/clip.mp4",
@@ -18,9 +19,12 @@ const defaultProps: LandscapeProps = {
   fps: 30,
 };
 
-const calculateMetadata = ({props}: {props: LandscapeProps}) => {
+const calculateMetadata = ({props}: {props: StyledReelProps}) => {
   const fps = props.fps ?? 30;
-  const durationInSeconds = props.durationInSeconds ?? 10;
+  // `durationInSeconds` is the assembled CUT. An endcard follows it rather than
+  // covering its last seconds, so the composition has to grow by exactly what
+  // verify_reel's expected duration already adds.
+  const durationInSeconds = reelDurationSeconds(props.durationInSeconds ?? 10, props.style);
   return {
     fps,
     durationInFrames: Math.max(1, Math.round(durationInSeconds * fps)),

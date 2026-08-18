@@ -31,6 +31,12 @@ export type Segment = {
   duration: number;
   beat: string;
   kind: "structural" | "mechanical";
+  /**
+   * The short on-screen label from a script's `# Step 2 :: Pat it dry`
+   * heading. Absent until a job has a script attached, which is why step
+   * badges fall back to the beat name.
+   */
+  label?: string;
 };
 
 export type LandscapeProps = {

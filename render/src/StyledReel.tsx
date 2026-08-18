@@ -2,13 +2,17 @@ import React from "react";
 import {AbsoluteFill, Audio, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
 
 import {Captions} from "./layers/Captions";
+import {Endcard} from "./layers/Endcard";
 import {Footage} from "./layers/Footage";
 import {Headline} from "./layers/Headline";
 import {LogoBug} from "./layers/LogoBug";
+import {LowerThird} from "./layers/LowerThird";
 import {Scrim} from "./layers/Scrim";
+import {StepLabels} from "./layers/StepLabels";
 import {originFor, scaleAt} from "./layers/zoom";
 import {transitionAt, transitionStyle} from "./transitions/presets";
 import {withDefaults} from "./style/defaults";
+import {endcardSeconds} from "./style/duration";
 import type {StyledReelProps} from "./types";
 
 /**
@@ -29,7 +33,7 @@ import type {StyledReelProps} from "./types";
  * re-encode, rather than as a per-frame CSS filter in headless Chrome -- and
  * putting it there means the preview shows it too.
  *
- * Still to come: transitions, music and b-roll.
+ * Still to come: music and b-roll.
  */
 export const StyledReel: React.FC<StyledReelProps> = (props) => {
   const frame = useCurrentFrame();
@@ -69,8 +73,17 @@ export const StyledReel: React.FC<StyledReelProps> = (props) => {
       <Scrim edge="bottom" spec={style.scrim?.bottom} width={width} />
 
       <Headline text={props.headline} spec={furniture.headline} width={width} />
+      <StepLabels spec={furniture.stepLabels} segments={props.segments} />
+      <LowerThird spec={furniture.lowerThird} />
       <Captions captions={props.captions} style={style.captions ?? {}} />
       <LogoBug spec={furniture.logoBug} />
+
+      {/* Last, and full-bleed: the endcard covers everything, including the
+          logo bug that is otherwise on screen for the whole reel. */}
+      <Endcard
+        spec={furniture.endcard}
+        cutSeconds={props.durationInSeconds ?? 0}
+      />
     </AbsoluteFill>
   );
 };
