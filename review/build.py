@@ -36,7 +36,18 @@ def load_manifest(path: Path) -> Dict[str, Any]:
 
 
 def make_html(entries: List[Dict[str, Any]]) -> str:
-    embedded = json.dumps(entries, ensure_ascii=False).replace("</", "<\\/")
+    """The review page. `entries` is accepted but no longer embedded.
+
+    The page fetches `manifest.json` at load instead. Baking the list into the
+    HTML meant two copies of the same truth, and deleting a reel had to update
+    both -- miss one and the page keeps naming a video that is already gone,
+    which is exactly what happened the first time a render had to be taken
+    down in a hurry. One source of truth, and a takedown becomes a single
+    write to the manifest.
+
+    The signature keeps `entries` so callers are unchanged and so the manifest
+    written beside this file stays the thing that decides what is listed.
+    """
     return f'''<!doctype html>
 <html lang="en">
 <head>
@@ -70,7 +81,7 @@ def make_html(entries: List[Dict[str, Any]]) -> str:
     <section id="renders"></section>
   </main>
   <script>
-    const renders = {embedded};
+    let renders = [];
     const storageKey = 'yap-editor-review-decisions';
     let decisions = {{}};
     try {{ decisions = JSON.parse(localStorage.getItem(storageKey) || '{{}}'); }} catch (error) {{ decisions = {{}}; }}
@@ -98,7 +109,18 @@ def make_html(entries: List[Dict[str, Any]]) -> str:
       const blob = JSON.stringify(decisions, null, 2);
       try {{ await navigator.clipboard.writeText(blob); alert('Decisions copied'); }} catch (error) {{ window.prompt('Copy decisions', blob); }}
     }});
-    draw();
+    // Same-origin, so the browser re-sends the review password automatically.
+    // A failure here is shown rather than swallowed: an empty page and a
+    // page that could not load its list look identical otherwise.
+    fetch('manifest.json', {{cache: 'no-store'}})
+      .then((response) => {{
+        if (!response.ok) throw new Error('manifest ' + response.status);
+        return response.json();
+      }})
+      .then((manifest) => {{ renders = manifest.renders || []; draw(); }})
+      .catch((error) => {{
+        renderList.innerHTML = '<p class="render">Could not load the render list: ' + error.message + '</p>';
+      }});
   </script>
 </body>
 </html>
