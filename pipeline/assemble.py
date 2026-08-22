@@ -22,6 +22,7 @@ from common import (
     has_audio,
     load_json,
     map_words_to_timeline,
+    measure_loudness,
     media_duration,
     repo_path,
     safe_record_path,
@@ -257,6 +258,57 @@ def loudness_targets(plan: Dict[str, Any]) -> Tuple[float, float, float]:
     return float(values.get("i", -14)), float(values.get("tp", -1.5)), float(values.get("lra", 11))
 
 
+# Keys ffmpeg's analysis pass returns that its second pass consumes. Named
+# rather than inlined so a measurement missing any one of them falls back to
+# one pass instead of building a filter ffmpeg rejects at runtime.
+MEASURED_KEYS = ("input_i", "input_tp", "input_lra", "input_thresh")
+
+
+def loudnorm_filter(
+    target_i: float,
+    target_tp: float,
+    target_lra: float,
+    measured: Optional[Dict[str, float]] = None,
+) -> str:
+    """The loudnorm filter string, two-pass when a measurement is available.
+
+    One pass does not hit the target, and the tolerance verify.py holds it to is
+    +/-1.0. Without the file's statistics up front, loudnorm runs its dynamic
+    mode blind: it normalises the opening seconds on incomplete gating data and
+    never fully recovers, which on a short reel is most of the file. Measured on
+    a 12s cut: -15.86 LUFS against a -14 target, 1.86 off and a hard verify
+    failure -- and its true peak came out at -1.30, past the -1.5 ceiling that
+    same pass was asked to hold. Feeding the analysis pass's numbers back in
+    took the identical file to -14.17.
+
+    `linear=true` asks for one constant gain over the whole file, which is what
+    keeps speech dynamics intact. ffmpeg falls back to its dynamic mode on its
+    own when that gain would breach the true-peak ceiling, so this is a
+    preference, not a promise -- and dynamic *with* the measurements is still
+    far closer than dynamic without them.
+
+    `offset` is pass one's `target_offset`, ffmpeg's own correction for the gap
+    between what it predicts and what it measures. It is optional in a way the
+    other four are not: without it the second pass still runs correctly, just
+    slightly less accurately, so a measurement that lacks it is still worth
+    using.
+    """
+    base = f"loudnorm=I={target_i}:TP={target_tp}:LRA={target_lra}"
+    if not measured or any(key not in measured for key in MEASURED_KEYS):
+        return base
+    parts = [
+        base,
+        f"measured_I={measured['input_i']}",
+        f"measured_TP={measured['input_tp']}",
+        f"measured_LRA={measured['input_lra']}",
+        f"measured_thresh={measured['input_thresh']}",
+    ]
+    if "target_offset" in measured:
+        parts.append(f"offset={measured['target_offset']}")
+    parts.append("linear=true")
+    return ":".join(parts)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cuts", type=Path)
@@ -376,8 +428,18 @@ def main() -> int:
             "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "copy",
         ]
         if any(take_audio.values()):
+            # Pass one: measure the concatenated rough, so pass two normalises
+            # with its statistics rather than guessing them as it goes. A
+            # measurement that fails is not worth failing an assembly over --
+            # loudnorm_filter falls back to the single pass, and verify.py is
+            # still the thing that decides whether the result is good enough.
+            try:
+                measured = measure_loudness(rough, target_i, target_tp, target_lra)
+            except RuntimeError as exc:
+                print(f"Loudness measurement failed, normalising in one pass: {exc}")
+                measured = None
             loudness_command += [
-                "-af", f"loudnorm=I={target_i}:TP={target_tp}:LRA={target_lra}",
+                "-af", loudnorm_filter(target_i, target_tp, target_lra, measured),
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
             ]
         loudness_command += ["-pix_fmt", "yuv420p", "-movflags", "+faststart", str(cut_path)]
