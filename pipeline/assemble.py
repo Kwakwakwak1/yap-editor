@@ -357,7 +357,10 @@ def respell_from_script(
         take: data.get("lines", [])
         for take, data in (aligned.get("takes") or {}).items()
     }
-    rows = project_rows_to_timeline(rows_by_take, resolved_segments)
+    # The words go with the rows: clipping a row to a segment has to count
+    # words, not seconds, because the gaps between words are most of a take and
+    # cutting is the act of removing them.
+    rows = project_rows_to_timeline(rows_by_take, resolved_segments, words_by_take)
     if not rows:
         return list(cues), 0
 

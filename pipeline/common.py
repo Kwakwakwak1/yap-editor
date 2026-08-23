@@ -196,6 +196,7 @@ def map_words_to_timeline(
 def project_rows_to_timeline(
     rows_by_take: Dict[str, Sequence[Dict[str, Any]]],
     segments: Iterable[Dict[str, Any]],
+    words_by_take: Optional[Dict[str, Sequence[Dict[str, Any]]]] = None,
 ) -> List[Dict[str, Any]]:
     """Project aligned script lines onto the assembled cut's timeline.
 
@@ -239,8 +240,10 @@ def project_rows_to_timeline(
             visible_to = min(float(row_to), end)
             if visible_to <= visible_from:
                 continue
-            output.append(_clip_row(row, float(row_from), float(row_to),
-                                    visible_from, visible_to, shift))
+            output.append(_clip_row(
+                row, float(row_from), float(row_to), visible_from, visible_to,
+                shift, (words_by_take or {}).get(str(segment.get("take", ""))),
+            ))
     return output
 
 
@@ -251,6 +254,7 @@ def _clip_row(
     visible_from: float,
     visible_to: float,
     shift: float,
+    take_words: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """One row, narrowed to the part of it the cut kept.
 
@@ -276,15 +280,58 @@ def _clip_row(
     clipped = dict(row, **{"from": visible_from + shift, "to": visible_to + shift})
     if span <= 0:
         return clipped
+
+    fractions = _kept_fraction(row_from, row_to, visible_from, visible_to, take_words)
     for key, value in (("line", str(row.get("line", "")).split()),
                        ("words", list(row.get("words") or []))):
         if not value:
             continue
-        first = int(len(value) * (visible_from - row_from) / span)
-        last = math.ceil(len(value) * (visible_to - row_from) / span)
+        first = int(len(value) * fractions[0])
+        last = math.ceil(len(value) * fractions[1])
         kept = value[first:max(last, first + 1)]
         clipped[key] = " ".join(kept) if key == "line" else kept
     return clipped
+
+
+def _kept_fraction(
+    row_from: float,
+    row_to: float,
+    visible_from: float,
+    visible_to: float,
+    take_words: Optional[Sequence[Dict[str, Any]]],
+) -> Tuple[float, float]:
+    """Where the kept range begins and ends, as a fraction of the row's WORDS.
+
+    By counting words when the transcript is available, and by elapsed time when
+    it is not.
+
+    The difference is not academic, and a real job is what showed it. Words are
+    not evenly spread across a take -- the gaps between them are most of it, and
+    cutting is precisely the act of removing those gaps. On a twelve-second cut
+    of a thirty-second take, timing the clip by elapsed time offered a one-word
+    cue two script words: the block came out uneven, and the correction was
+    refused for a reason that had nothing to do with the words.
+
+    Counting words is exact wherever a transcript exists, which is every path
+    that reaches this today. The time fallback keeps the function honest for a
+    caller that has rows but no words.
+    """
+    if take_words:
+        spoken = [
+            index for index, word in enumerate(take_words)
+            if row_from <= float(word.get("start", -1)) <= row_to
+        ]
+        if spoken:
+            inside = [
+                position for position, index in enumerate(spoken)
+                if visible_from <= float(take_words[index].get("start", -1)) <= visible_to
+            ]
+            if inside:
+                return inside[0] / len(spoken), (inside[-1] + 1) / len(spoken)
+    span = row_to - row_from
+    if span <= 0:
+        return 0.0, 1.0
+    return (visible_from - row_from) / span, (visible_to - row_from) / span
 
 
 def normalize_word(value: str) -> str:
