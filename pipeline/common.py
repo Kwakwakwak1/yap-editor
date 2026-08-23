@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import math
+
 import json
 import os
 import subprocess
@@ -237,11 +239,52 @@ def project_rows_to_timeline(
             visible_to = min(float(row_to), end)
             if visible_to <= visible_from:
                 continue
-            output.append(dict(row, **{
-                "from": visible_from + shift,
-                "to": visible_to + shift,
-            }))
+            output.append(_clip_row(row, float(row_from), float(row_to),
+                                    visible_from, visible_to, shift))
     return output
+
+
+def _clip_row(
+    row: Dict[str, Any],
+    row_from: float,
+    row_to: float,
+    visible_from: float,
+    visible_to: float,
+    shift: float,
+) -> Dict[str, Any]:
+    """One row, narrowed to the part of it the cut kept.
+
+    THE WORDS ARE NARROWED TOO, and that is the whole point of this function.
+    A row whose span is clipped but whose text is not claims all eighteen words
+    of its line across the three quarters of a second that survived -- and
+    script_spelling's `_overlapping_words` reads the span to decide how many
+    words to offer a cue, so it hands a two-word cue the entire line. The
+    resulting replace block is uneven, `corrections_for` refuses it, and every
+    correction silently does not happen.
+
+    Measured on a real job before this existed: six segments, six projected
+    rows, eighteen words offered to a cue reading "Oh, hey.", zero corrections
+    applied, and no error anywhere.
+
+    The words are assumed evenly spread across the row's span, which is not a
+    new assumption -- it is the one `_overlapping_words` already makes, and
+    shotlist.py with it. It only has to be good enough to bring the right
+    handful of words into the comparison; the similarity threshold decides the
+    rest.
+    """
+    span = row_to - row_from
+    clipped = dict(row, **{"from": visible_from + shift, "to": visible_to + shift})
+    if span <= 0:
+        return clipped
+    for key, value in (("line", str(row.get("line", "")).split()),
+                       ("words", list(row.get("words") or []))):
+        if not value:
+            continue
+        first = int(len(value) * (visible_from - row_from) / span)
+        last = math.ceil(len(value) * (visible_to - row_from) / span)
+        kept = value[first:max(last, first + 1)]
+        clipped[key] = " ".join(kept) if key == "line" else kept
+    return clipped
 
 
 def normalize_word(value: str) -> str:

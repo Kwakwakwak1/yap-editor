@@ -91,6 +91,34 @@ class ProjectRows(unittest.TestCase):
         self.assertAlmostEqual(out[1]["from"], 2.0, places=6)
         self.assertAlmostEqual(out[1]["to"], 4.0, places=6)
 
+    def test_narrows_a_clipped_row_s_words_along_with_its_span(self):
+        # The bug this function shipped with, found on real footage rather than
+        # by a test: a row whose span was clipped but whose text was not claimed
+        # all eighteen words of its line across the 0.76s that survived.
+        # script_spelling reads the span to decide how many words to offer a
+        # cue, so a two-word cue was handed the whole line, the replace block
+        # came out uneven, and every correction was silently refused.
+        rows = {"A": [row(start=0.0, end=10.0, line="one two three four five")]}
+        out = project_rows_to_timeline(rows, [segment("A", 0.0, 2.0, offset=0.0)])
+
+        # The first fifth of the line, for the first fifth of its span.
+        self.assertEqual(out[0]["line"], "one")
+
+    def test_keeps_at_least_one_word_in_a_very_short_clip(self):
+        # A sliver of a segment must not produce a row with no text at all --
+        # correct_cues would then treat the row as having nothing to say about
+        # a cue that is genuinely inside it.
+        rows = {"A": [row(start=0.0, end=100.0, line="one two three")]}
+        out = project_rows_to_timeline(rows, [segment("A", 0.0, 0.01, offset=0.0)])
+
+        self.assertTrue(out[0]["line"])
+
+    def test_leaves_an_unclipped_row_s_words_alone(self):
+        rows = {"A": [row(start=1.0, end=2.0, line="one two three four five")]}
+        out = project_rows_to_timeline(rows, [segment("A", 0.0, 5.0, offset=0.0)])
+
+        self.assertEqual(out[0]["line"], "one two three four five")
+
     def test_drops_a_row_that_was_cut_out_entirely(self):
         # Not an error. The line was not delivered on screen, so there is
         # nothing to respell, and a row projected anyway would offer script
