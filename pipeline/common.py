@@ -191,6 +191,59 @@ def map_words_to_timeline(
     return output
 
 
+def project_rows_to_timeline(
+    rows_by_take: Dict[str, Sequence[Dict[str, Any]]],
+    segments: Iterable[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Project aligned script lines onto the assembled cut's timeline.
+
+    `align_take` reports each script line's span in TAKE time. `build_captions`
+    builds its cues in CUT time, via map_words_to_timeline. `correct_cues`
+    overlaps the two to decide which script words are context for which cue --
+    so handing it one of each compares numbers from different clocks. It does
+    not raise: the overlap simply never matches, every cue comes back unchanged,
+    and the respelling pass reports success having done nothing at all.
+
+    The shift is `offset - padded_start`, the same rule map_words_to_timeline
+    applies, and it lives here beside it deliberately. That function's docstring
+    records what happened when this rule had two implementations: "they had
+    already drifted: one clamped negative timestamps and stripped whitespace,
+    the other did neither."
+
+    A row is clipped to the kept range of each segment it survives in, and a row
+    spanning a cut appears once per segment -- both halves are on screen, so both
+    need their spelling. A row cut out entirely yields nothing, which is correct:
+    those words never reach the viewer.
+    """
+    output: List[Dict[str, Any]] = []
+    for segment in segments:
+        try:
+            start = float(segment["start"])
+            end = float(segment["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        rows = rows_by_take.get(str(segment.get("take", ""))) or []
+        # Same permissive `.get` defaults as map_words_to_timeline: it is called
+        # on this very data by verify.py with segments that carry neither key.
+        shift = float(segment.get("offset", 0.0)) - float(
+            segment.get("padded_start", start))
+        for row in rows:
+            row_from, row_to = row.get("from"), row.get("to")
+            if row_from is None or row_to is None:
+                # A line align_take could not find in this take. Recorded rather
+                # than omitted upstream, so it arrives here and is skipped.
+                continue
+            visible_from = max(float(row_from), start)
+            visible_to = min(float(row_to), end)
+            if visible_to <= visible_from:
+                continue
+            output.append(dict(row, **{
+                "from": visible_from + shift,
+                "to": visible_to + shift,
+            }))
+    return output
+
+
 def normalize_word(value: str) -> str:
     import re
 
