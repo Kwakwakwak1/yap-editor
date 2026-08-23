@@ -23,6 +23,7 @@ from common import (
     load_json,
     map_words_to_timeline,
     measure_loudness,
+    project_rows_to_timeline,
     media_duration,
     repo_path,
     safe_record_path,
@@ -31,6 +32,8 @@ from common import (
     write_json,
 )
 from grade import filter_string
+from align import align
+from script_spelling import correct_cues
 
 
 ENCODERS = {"libx264", "h264_videotoolbox", "h264_nvenc"}
@@ -309,6 +312,63 @@ def loudnorm_filter(
     return ":".join(parts)
 
 
+def respell_from_script(
+    plan: Dict[str, Any],
+    resolved_segments: Sequence[Dict[str, Any]],
+    cues: Sequence[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], int]:
+    """Spell the cues the way the attached script spells them.
+
+    Whisper mangles brand names and proper nouns; the script has them right.
+    Where alignment is confident, the script's spelling wins -- and where it is
+    not, nothing happens, which is the common case and must stay cheap.
+
+    THE CLOCK IS THE WHOLE TRICK. `align` reports each line's span in take
+    time. These cues are in cut time. `correct_cues` decides which script words
+    are context for which cue by overlapping the two, so they have to be on the
+    same timeline first -- and getting that wrong fails silently, returning
+    every cue unchanged while reporting that the pass ran.
+
+    Returns the cues and how many changed, so the caller can say so. A count is
+    the only signal that this did anything at all: a respelled cue looks exactly
+    like a cue that was already right.
+    """
+    script = str(plan.get("script") or "").strip()
+    if not script or not cues:
+        return list(cues), 0
+
+    words_by_take: Dict[str, List[Dict[str, Any]]] = {}
+    for take_id, take in (plan.get("takes") or {}).items():
+        value = take.get("words")
+        if not value:
+            continue
+        path = repo_path(value)
+        # Missing is tolerated for the same reason build_captions tolerates it:
+        # a take with no transcript is a take with no captions, not a failed
+        # assembly.
+        if not path.exists():
+            continue
+        words_by_take[str(take_id)] = load_json(path).get("words", [])
+    if not words_by_take:
+        return list(cues), 0
+
+    aligned = align(script, words_by_take)
+    rows_by_take = {
+        take: data.get("lines", [])
+        for take, data in (aligned.get("takes") or {}).items()
+    }
+    rows = project_rows_to_timeline(rows_by_take, resolved_segments)
+    if not rows:
+        return list(cues), 0
+
+    fixed = correct_cues(cues, rows)
+    changed = sum(
+        1 for before, after in zip(cues, fixed)
+        if before.get("text") != after.get("text")
+    )
+    return fixed, changed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cuts", type=Path)
@@ -457,7 +517,10 @@ def main() -> int:
         max_words, max_seconds = caption_grouping(
             plan, args.caption_words, args.caption_max_seconds)
         cues, skipped_takes = build_captions(plan, resolved_segments, max_words, max_seconds)
+        cues, respelled = respell_from_script(plan, resolved_segments, cues)
         write_captions(build_dir, cues)
+        if respelled:
+            print(f"Script spelling: {respelled} cue(s) respelled from the script")
         for take_id in skipped_takes:
             print(f"Captions skipped for take {take_id}: no words file")
 
