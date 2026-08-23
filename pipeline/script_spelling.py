@@ -67,6 +67,17 @@ def _similar(said: str, written: str) -> float:
     return difflib.SequenceMatcher(a=said, b=written, autojunk=False).ratio()
 
 
+def plausible_respelling(said: str, written: str) -> bool:
+    """Whether `written` is a plausible misspelling of `said`, not a different word.
+
+    The public form of the threshold this module already applies. Exported so
+    the manual-correction path in assemble.py holds a person to the same rule as
+    the script pass, rather than carrying a second copy of the number -- which
+    is how the two would come to disagree about what counts as a correction.
+    """
+    return _similar(said, written) >= SIMILARITY
+
+
 def corrections_for(
     said: Sequence[str], written: Sequence[str]
 ) -> Dict[int, str]:
@@ -115,7 +126,7 @@ def corrections_for(
     return out
 
 
-def _respell(word: str, replacement: str) -> str:
+def respell(word: str, replacement: str) -> str:
     """The script's spelling, keeping the transcript's punctuation.
 
     Whisper attaches sentence punctuation to words and the script does not
@@ -156,7 +167,7 @@ def correct_cue(cue: Dict[str, Any], written: Sequence[str]) -> Dict[str, Any]:
         return cue
 
     fixed = [
-        dict(word, text=_respell(str(word.get("text", "")), corrections[index]))
+        dict(word, text=respell(str(word.get("text", "")), corrections[index]))
         if index in corrections else word
         for index, word in enumerate(words)
     ]

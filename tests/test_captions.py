@@ -141,13 +141,22 @@ class CaptionCue(unittest.TestCase):
 class BuildCaptions(unittest.TestCase):
     """The grouping rules, exercised through the real entry point."""
 
-    def build(self, words, max_words=5, max_seconds=2.4):
+    def build(self, words, max_words=5, max_seconds=2.4, plan_extra=None):
+        """`(cues, skipped)`, dropping the refusals these tests do not exercise.
+
+        build_captions grew a third return value when caption corrections
+        landed: the ones it could not apply, which the caller reports as
+        warnings. test_caption_corrections.py owns that behaviour.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             words_file = Path(tmp) / "A.words.json"
             words_file.write_text(json.dumps({"words": words}), encoding="utf-8")
             plan = {"takes": {"A": {"words": str(words_file)}}}
+            plan.update(plan_extra or {})
             segments = [segment("A", 0.0, 100.0, 0.0, 0.0)]
-            return build_captions(plan, segments, max_words, max_seconds)
+            cues, skipped, _refusals = build_captions(
+                plan, segments, max_words, max_seconds)
+            return cues, skipped
 
     def test_splits_on_max_words(self):
         cues, skipped = self.build(
@@ -184,7 +193,7 @@ class BuildCaptions(unittest.TestCase):
 
     def test_reports_takes_with_no_words_file(self):
         plan = {"takes": {"A": {"words": "/nonexistent/A.words.json"}, "B": {}}}
-        cues, skipped = build_captions(plan, [segment("A", 0.0, 1.0, 0.0, 0.0)], 5, 2.4)
+        cues, skipped, _ = build_captions(plan, [segment("A", 0.0, 1.0, 0.0, 0.0)], 5, 2.4)
         self.assertEqual(cues, [])
         self.assertEqual(sorted(skipped), ["A", "B"])
 

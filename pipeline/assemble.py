@@ -23,6 +23,7 @@ from common import (
     load_json,
     map_words_to_timeline,
     measure_loudness,
+    normalize_word,
     project_rows_to_timeline,
     media_duration,
     repo_path,
@@ -33,7 +34,7 @@ from common import (
 )
 from grade import filter_string
 from align import align
-from script_spelling import correct_cues
+from script_spelling import correct_cues, plausible_respelling, respell
 
 
 ENCODERS = {"libx264", "h264_videotoolbox", "h264_nvenc"}
@@ -101,6 +102,69 @@ def caption_words(path: Path) -> List[Dict[str, Any]]:
     except (OSError, ValueError):
         return []
     return data.get("words", []) if isinstance(data, dict) else []
+
+
+def apply_corrections(
+    words: Sequence[Dict[str, Any]],
+    corrections: Sequence[Dict[str, Any]],
+    take_id: str,
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Respell words a person corrected, and refuse the ones that no longer fit.
+
+    Applied here, at load, rather than to the finished cues -- this is the last
+    point where a word still knows which take and index it came from.
+    map_words_to_timeline returns `{from, to, text}` and drops everything else,
+    by design, so a correction pinned to a word cannot be matched after it.
+
+    THE `from` CHECK IS THE SAFETY MECHANISM. Re-transcribing a take shifts
+    every index after an inserted word. A correction applied blindly would then
+    respell whatever moved into that slot -- on screen, in someone's voice, with
+    nothing downstream able to tell. So a correction whose original text no
+    longer matches is refused and reported, never applied.
+
+    Matching ignores case and surrounding punctuation: whisper writes
+    "Quackwackwack," and a person types the word. Refusing that would be a
+    refusal for something that is not a difference.
+    """
+    out = [dict(word) for word in words]
+    refused: List[str] = []
+    for correction in corrections:
+        if str(correction.get("take", "")) != str(take_id):
+            continue
+        index = int(correction.get("word_index", -1))
+        was = str(correction.get("from", ""))
+        now = str(correction.get("to", ""))
+        if index < 0 or index >= len(out):
+            refused.append(
+                f"take {take_id} word {index} ({was!r} -> {now!r}): the "
+                f"transcript has only {len(out)} words")
+            continue
+        found = str(out[index].get("word", ""))
+        if normalize_word(found) != normalize_word(was):
+            refused.append(
+                f"take {take_id} word {index}: expected {was!r} but the "
+                f"transcript now says {found!r} - the correction was not applied")
+            continue
+        # The same threshold the script pass is held to, and for the same
+        # reason: a caption containing a word nobody said is a lie the viewer
+        # has no way to detect. A person typing one is still typing one.
+        #
+        # `override` is how they say "I did say this" -- for a word whisper
+        # mangled beyond a respelling, which script_spelling deliberately
+        # cannot fix ("kwak" for "quack" is 0.222, below pairs that must be
+        # refused). Explicit rather than implied, because it is the only path
+        # that can put an unheard word on screen.
+        if not correction.get("override") and not plausible_respelling(
+                normalize_word(found), normalize_word(now)):
+            refused.append(
+                f"take {take_id} word {index}: {now!r} is not a respelling of "
+                f"{found!r} - set override on the correction to apply it anyway")
+            continue
+        # respell() keeps the transcript's punctuation, which is the same split
+        # the script pass makes: a comma is not part of what somebody corrected,
+        # and dropping it would change the caption's grouping.
+        out[index] = dict(out[index], word=respell(found, now), manual=True)
+    return out, refused
 
 
 def sentence_end(word: str) -> bool:
@@ -204,15 +268,30 @@ def format_srt_time(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds_part:02d},{millis:03d}"
 
 
+def _cue(current: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """A cue, flagged when any word in it was corrected by a person.
+
+    The flag is what keeps the script pass off it. Both passes want authority
+    over the same token, and a person who typed a correction outranks a script
+    that merely disagrees with the transcript.
+    """
+    cue = caption_cue(current)
+    if any(word.get("manual") for word in current):
+        cue["manual"] = True
+    return cue
+
+
 def build_captions(
     plan: Dict[str, Any],
     resolved_segments: Sequence[Dict[str, Any]],
     max_words: int,
     max_seconds: float,
-) -> Tuple[List[Dict[str, Any]], List[str]]:
+) -> Tuple[List[Dict[str, Any]], List[str], List[str]]:
     takes = plan["takes"]
     loaded: Dict[str, List[Dict[str, Any]]] = {}
     skipped: List[str] = []
+    corrections = plan.get("caption_corrections") or []
+    refusals: List[str] = []
     for take_id, take in takes.items():
         words_value = take.get("words")
         if not words_value:
@@ -222,7 +301,13 @@ def build_captions(
         if not words_path.exists():
             skipped.append(str(take_id))
             continue
-        loaded[str(take_id)] = caption_words(words_path)
+        # Corrections are applied HERE, before the words are projected onto the
+        # cut and grouped into cues -- this is the last point at which a word
+        # still knows which take and index it came from.
+        corrected, refused = apply_corrections(
+            caption_words(words_path), corrections, str(take_id))
+        refusals.extend(refused)
+        loaded[str(take_id)] = corrected
 
     mapped = map_words_to_timeline(loaded, resolved_segments)
 
@@ -234,15 +319,15 @@ def build_captions(
         would_exceed_words = len(current) >= max_words
         would_exceed_time = bool(current) and word["to"] - current[0]["from"] > max_seconds
         if current and (would_exceed_words or would_exceed_time):
-            cues.append(caption_cue(current))
+            cues.append(_cue(current))
             current = []
         current.append(word)
         if sentence_end(word["text"]):
-            cues.append(caption_cue(current))
+            cues.append(_cue(current))
             current = []
     if current:
-        cues.append(caption_cue(current))
-    return cues, skipped
+        cues.append(_cue(current))
+    return cues, skipped, refusals
 
 
 def write_captions(build_dir: Path, cues: Sequence[Dict[str, Any]]) -> None:
@@ -365,6 +450,13 @@ def respell_from_script(
         return list(cues), 0
 
     fixed = correct_cues(cues, rows)
+    # A person who typed a correction outranks a script that merely disagrees
+    # with the transcript. Both passes want authority over the same token; this
+    # is where that is decided, and it is decided in the person's favour.
+    fixed = [
+        dict(original) if original.get("manual") else corrected
+        for original, corrected in zip(cues, fixed)
+    ]
     changed = sum(
         1 for before, after in zip(cues, fixed)
         if before.get("text") != after.get("text")
@@ -519,11 +611,18 @@ def main() -> int:
 
         max_words, max_seconds = caption_grouping(
             plan, args.caption_words, args.caption_max_seconds)
-        cues, skipped_takes = build_captions(plan, resolved_segments, max_words, max_seconds)
+        cues, skipped_takes, refusals = build_captions(
+            plan, resolved_segments, max_words, max_seconds)
         cues, respelled = respell_from_script(plan, resolved_segments, cues)
         write_captions(build_dir, cues)
         if respelled:
             print(f"Script spelling: {respelled} cue(s) respelled from the script")
+        for refusal in refusals:
+            # Prefixed, because render_worker.py parses this output and treats a
+            # line it does not recognise as blocking. A refused correction is a
+            # warning: the reel is fine, one word is spelled the way whisper
+            # heard it.
+            print(f"Caption correction refused: {refusal}")
         for take_id in skipped_takes:
             print(f"Captions skipped for take {take_id}: no words file")
 

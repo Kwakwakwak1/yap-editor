@@ -185,11 +185,18 @@ def map_words_to_timeline(
                 continue
             if word_end <= start or word_start >= end:
                 continue
-            output.append({
+            projected = {
                 "from": max(0.0, word_start + shift),
                 "to": max(0.0, word_end + shift),
                 "text": str(word.get("word", "")).strip(),
-            })
+            }
+            if word.get("manual"):
+                # Additive and optional: a word a person respelled, so the
+                # script pass can be kept off the cue that holds it. verify.py
+                # reads `text` and nothing else, so this reaches assemble.py's
+                # grouping without changing what the other caller sees.
+                projected["manual"] = True
+            output.append(projected)
     return output
 
 
