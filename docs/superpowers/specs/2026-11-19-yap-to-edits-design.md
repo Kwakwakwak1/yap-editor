@@ -27,12 +27,17 @@ This joins the two: yap decides, Edits finishes.
    `dropbox/` → indexer → studio library. (2026-11-19: kwakmini64's launchd
    interval timers had stopped since about 2026-09-10; the jobs now use
    `StartCalendarInterval`.)
-2. **Prep** (unchanged, minik): `transcribe.py` → `plan.py --energy` gives a
-   draft `cuts.json`.
+2. **Prep** (yap's laptop path, on the Mac that runs Edits): fetch the take
+   from T9 over the kwakmini64 SSH that already works, then `transcribe.py`
+   (mlx-whisper) → `plan.py --energy` gives a draft `cuts.json`. This path
+   doesn't use minik. The Mac is Apple silicon (arm64, 16 GB), Edits and
+   `~/Movies` are local to it, and minik isn't reachable over SSH from it
+   (2026-11-19: key refused). The studio job path on minik (yap-prep and
+   Remotion) is untouched.
 3. **Editorial pass and approval gate** (unchanged rules, `agent/AGENT.md`):
    hook selection, beat order, length, story rules. Nothing is cut until Kris
    answers.
-4. **Cut for Edits** (new, minik): `pipeline/edits_export.py`.
+4. **Cut for Edits** (new, same Mac): `pipeline/edits_export.py`.
 5. **Build in Edits** (new, this Mac): the `yap-to-edits` skill, driving the
    Edits MCP tools.
 6. **Finish:** Kris posts from Edits, or asks for an export, which is verified
@@ -59,11 +64,13 @@ build/<slug>/edits/
 
 | Decision | Choice | Why |
 |---|---|---|
-| Container and codec | ProRes 422 HQ `.mov`, 30 fps (the plan's `fps`), PCM 48 kHz audio | Edits imports and scrubs ProRes without re-decoding |
+| Container and codec | ProRes 422 (standard, `prores_ks` profile 2) `.mov`, 30 fps (the plan's `fps`), PCM 48 kHz audio | Edits imports and scrubs ProRes without re-decoding. Standard, not HQ: about 1.1 GB/min at 1080p30 against HQ's 1.6, and the Mac has about 11 GB free (2026-11-19) |
+| Disk space | Before cutting, estimate the output (sum of clip durations × 147 Mbps), and refuse unless free space on the output volume is at least 3× that | Edits may copy imported media into its own library, and the Mac is tight on space |
+| Colour grade | Apply the plan's `style.grade` filter string the same way `assemble.py` does (`filter_string`) | A v2 plan's look must match whichever renderer is used |
 | Cut points | Frame-accurate re-encode at `start - pad[0]` … `end + pad[1]`, clamped to the take, with the plan's `pad` (default 0.07/0.07) | The same boundaries `assemble.py` uses, so a clip is exactly the beat yap meant |
 | File name | `NN-<beat>.mov`: NN is the 1-based position in `segments` (two digits), and the beat is slugged to `[a-z0-9-]`, falling back to `segment` | Sorts in cut order in Finder and Edits; segments are never re-sorted |
-| HDR sources (iPhone HLG/PQ) | Tone-mapped to BT.709 SDR (`zscale` + `tonemap=hable`, then `format=yuv422p10le`) | Edits projects here are SDR. Untreated HDR looks washed out or blown out |
-| Rotation | Read the display rotation the same way `render_worker`'s probe does, never raw width and height | Phones store portrait as rotated landscape |
+| HDR sources (iPhone HLG/PQ) | Detect from the stream's `color_transfer` (`arib-std-b67` or `smpte2084`), then convert to BT.709 SDR with VideoToolbox (`scale_vt` with `color_matrix`/`color_primaries`/`color_transfer` set to bt709). Then check the output's tags with ffprobe. If conversion isn't available or the tags are wrong, **refuse**; never pass HDR through silently | Edits projects here are SDR, and untreated HDR looks washed out or blown out. This Mac's Homebrew ffmpeg 8.1 has `scale_vt` and `tonemap` but no `zscale`. SDR takes (the 2026-11-19 take is H.264 BT.709) skip this |
+| Rotation | Read the display rotation (`side_data` `rotation`, e.g. -90 on the 2026-11-19 take). The probe moves into `pipeline/common.py`, ported from the skill's `render_worker` probe, because `pipeline/` can't import the skill's scripts. It is never raw width and height | Phones store portrait as rotated landscape |
 | 9:16 source | 1080×1920 | Matches `PortraitFull` |
 | 16:9 source | 1920×1080, kept landscape | The builder fits it to width on black in Edits, as `LandscapeOnBlack` does, but it stays reframable |
 | Mixed takes | Each segment is cut from its own take; the orientation is per take | `takes` is a map, and a segment can come from any take |
@@ -95,6 +102,10 @@ build/<slug>/edits/
 - `duration` is the clip file's measured duration.
 - Top-level `orientation` is `portrait`, `landscape` or `mixed`.
 
+Padding is applied per segment and clamped only at the take's edges, exactly as
+`assemble.py` does. Two segments that are contiguous in the source therefore
+share up to `pad[0] + pad[1]` of overlap, as they do in today's renders.
+
 ### Failures
 
 - An invalid plan (`validate_plan` from `assemble.py`) exits non-zero with no
@@ -115,8 +126,16 @@ to be open.
    `~/Movies/yap/<slug>/`, which is the only folder Edits may read.
    `edits_plan.py check` confirms every clip in `plan.json` exists with its
    duration within one frame.
-2. **Preflight:** `appState` is reachable. If Edits is closed or the automation
-   server is off, stop and say so.
+2. **Preflight:**
+   - `appState` is reachable. If Edits is closed or the automation server is
+     off, stop and say so.
+   - Edits' editing tools only appear once a project is open, so their
+     argument schemas (`editCaption`, `setCaptionHighlightColor`,
+     `setTransform`, `setCanvas`, `setAspectRatio`, `elements`) are read right
+     after step 3, before any call.
+   - If a tool this skill needs is missing, or its arguments differ from what
+     the skill expects, stop and report it. Don't improvise around it: the
+     bridge is updated weekly.
 3. **Project:** `newProject` named `yap · <headline>`;
    `setProjectDynamicRange SDR`; 9:16; black background.
 4. **Clips:** add each clip in `plan.json` order to the main track. Read
@@ -130,11 +149,15 @@ to be open.
    - `edits_plan.py align` lines Edits' words up against `plan.json` words
      (sequence alignment on normalised tokens, by clip) and returns the edits
      to make.
-   - Apply them with `editCaption`.
+   - Apply them with `editCaption`. Edits' captions are phrase elements, so a
+     correction replaces a caption element's text and keeps Edits' own timing
+     and word highlighting.
    - A region where alignment confidence is below the threshold is left
      alone and reported with its time.
    - Style: one caption preset (default `Word Highlight Box`), with the
-     highlight in the brand accent from `brand.json`.
+     highlight in the brand accent. The accent is read from the studio
+     (`GET /studio/brands/<slug>`, through kwakmini64 where the credentials
+     live), because `brand.json` is on T9, not this Mac.
 7. **Decoration:** none for standard, walking or car yaps. Graphic yaps get the
    overlays `overlays.json` suggests (yap's rule).
 8. **Checks:** frame 0 is the hook and reads as a cover. `captureFrame` at every
@@ -150,8 +173,12 @@ to be open.
   the timeline within 0.1 s, 1080×1920.
 - Upload and schedule through the studio as today: `POST /media`, then a batch.
   Trials use `trial_params` and post on their own; follower posts wait for
-  Kris's approval. The batch title carries the slug, and the post records the
-  hook text and `built_by: "yap→edits"` for the analytics project.
+  Kris's approval. Studio posts have no metadata field yet, so the batch title
+  carries `yap→edits · <slug>`, and the hook text goes in the local
+  `plan.json`. Proper fields arrive with the analytics project.
+- Cleanup: `~/Movies/yap/<slug>/` is kept until the post is published or Kris
+  says to discard it. Then the skill offers to delete the clips and the
+  fetched take (Edits keeps its own copy inside the project).
 - If Kris changed the project by hand, the export includes the changes. The
   builder never rebuilds over a project Kris has touched.
 
@@ -174,7 +201,12 @@ test media like the current tests):
   their difference;
 - a landscape and a portrait take in one plan give per-clip orientation and
   `mixed`;
-- an HDR test source comes out BT.709 (checked with ffprobe's `color_transfer`);
+- an HDR test source comes out BT.709 (checked with ffprobe's `color_transfer`),
+  and when the HDR conversion is unavailable the export refuses;
+- a rotated (-90) portrait source gives 1080×1920 clips;
+- `style.grade` is applied when present;
+- the disk-space check refuses when the estimate exceeds a third of free
+  space;
 - an invalid plan leaves no output folder.
 
 **`edits_plan.py`**: `check` (missing file, wrong duration); `align` (exact
