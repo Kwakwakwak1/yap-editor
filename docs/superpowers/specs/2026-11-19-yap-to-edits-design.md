@@ -97,8 +97,11 @@ build/<slug>/edits/
 ```
 
 - `words` holds that clip's words from the take's `words.json`, with any
-  `caption_corrections` and script respellings applied (the same functions
-  `assemble.py` uses), shifted so 0 is the clip's first frame.
+  `caption_corrections` applied (`assemble.apply_corrections`, applied to the
+  whole take before slicing, because corrections are pinned to word indexes),
+  shifted so 0 is the clip's first frame. Script respelling (`respell_from_script`)
+  is left out of v1: it only matters for scripted takes, and the Edits caption
+  correction pass catches the same misspellings against these words.
 - `duration` is the clip file's measured duration.
 - Top-level `orientation` is `portrait`, `landscape` or `mixed`.
 
