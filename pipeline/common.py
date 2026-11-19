@@ -92,6 +92,53 @@ def video_pixel_format(path: Path) -> str:
     return ""
 
 
+HDR_TRANSFERS = ("arib-std-b67", "smpte2084")
+
+
+def framing_from_probe(probe: Dict[str, Any]) -> str:
+    """The source footage's orientation, "portrait" or "landscape".
+
+    Not from width and height alone: phone footage stores 3840x2160 with a
+    rotation of +/-90 in the stream's side data. Ported from the yap-editor
+    skill's render_worker.framing so pipeline scripts can use it.
+    """
+    for stream in probe.get("streams", []):
+        if stream.get("codec_type") != "video":
+            continue
+        try:
+            width = int(stream["width"])
+            height = int(stream["height"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("video stream missing width or height") from None
+        rotation = 0
+        for side_data in stream.get("side_data_list", []) or []:
+            if "rotation" in side_data:
+                rotation = int(side_data["rotation"])
+                break
+        if abs(rotation) % 180 == 90:
+            width, height = height, width
+        return "portrait" if height > width else "landscape"
+    raise ValueError("probe contains no video stream")
+
+
+def source_framing(path: Path) -> str:
+    return framing_from_probe(
+        ffprobe_json(path, "stream=codec_type,width,height:stream_side_data=rotation")
+    )
+
+
+def video_transfer(path: Path) -> str:
+    data = ffprobe_json(path, "stream=codec_type,color_transfer")
+    for stream in data.get("streams", []):
+        if stream.get("codec_type") == "video":
+            return str(stream.get("color_transfer", "") or "")
+    return ""
+
+
+def is_hdr_transfer(transfer: str) -> bool:
+    return transfer in HDR_TRANSFERS
+
+
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
